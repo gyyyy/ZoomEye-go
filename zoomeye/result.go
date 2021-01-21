@@ -3,12 +3,35 @@ package zoomeye
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"reflect"
 	"regexp"
 	"strings"
 )
 
 var (
+	statisticsFields = map[string]map[string]string{
+		"host": map[string]string{
+			"app":     "portinfo.app",
+			"device":  "portinfo.device",
+			"service": "portinfo.service",
+			"os":      "portinfo.os",
+			"port":    "portinfo.port",
+			"country": "geoinfo.country.names.en",
+			"city":    "geoinfo.city.names.en",
+		},
+		"web": map[string]string{
+			"webapp":    "webapp",
+			"component": "component",
+			"framework": "framework",
+			"frontend":  "frontend",
+			"server":    "server",
+			"waf":       "waf",
+			"os":        "system",
+			"country":   "geoinfo.country.names.en",
+			"city":      "geoinfo.city.names.en",
+		},
+	}
 	filterFields = map[string]map[string]string{
 		"host": map[string]string{
 			"_index":     "ip",
@@ -37,28 +60,6 @@ var (
 			"city_cn":    "geoinfo.city.names.zh-CN",
 			"country":    "geoinfo.country.names.en",
 			"country_cn": "geoinfo.country.names.zh-CN",
-		},
-	}
-	statisticsFields = map[string]map[string]string{
-		"host": map[string]string{
-			"app":     "portinfo.app",
-			"device":  "portinfo.device",
-			"service": "portinfo.service",
-			"os":      "portinfo.os",
-			"port":    "portinfo.port",
-			"country": "geoinfo.country.names.en",
-			"city":    "geoinfo.city.names.en",
-		},
-		"web": map[string]string{
-			"webapp":    "",
-			"component": "",
-			"framework": "",
-			"frontend":  "",
-			"server":    "",
-			"waf":       "",
-			"os":        "",
-			"country":   "",
-			"city":      "",
 		},
 	}
 )
@@ -211,6 +212,53 @@ func (r *SearchResult) Hosts() []map[string]string {
 	return m
 }
 
+// Statistics counts data by specified fields from search results
+func (r *SearchResult) Statistics(keys ...string) map[string]map[string]int {
+	var (
+		counts     = make(map[string]map[string]int)
+		fields, ok = statisticsFields[r.Type]
+	)
+	if !ok {
+		return counts
+	}
+	for _, k := range keys {
+		k = strings.ToLower(strings.TrimSpace(k))
+		field, ok := fields[k]
+		if !ok {
+			continue
+		}
+		if _, ok := counts[k]; !ok {
+			counts[k] = make(map[string]int)
+		}
+		for _, v := range r.Matches {
+			switch s := v.Find(field).(type) {
+			case string:
+				if s != "" {
+					counts[k][s]++
+					continue
+				}
+			case []interface{}:
+				if len(s) > 0 {
+					for _, sv := range s {
+						if sv, ok := sv.(map[string]interface{}); ok {
+							name, ok := sv["name"]
+							if !ok || name == nil {
+								name = "[unknown]"
+							}
+							counts[k][fmt.Sprintf("%v", name)]++
+						} else {
+							counts[k]["[unknown]"]++
+						}
+					}
+					continue
+				}
+			}
+			counts[k]["[unknown]"]++
+		}
+	}
+	return counts
+}
+
 // Filter extracts data by specified fields from search results
 func (r *SearchResult) Filter(keys ...string) []map[string]interface{} {
 	var (
@@ -231,6 +279,7 @@ func (r *SearchResult) Filter(keys ...string) []map[string]interface{} {
 		}
 	}
 	keys = append(keys, "_index")
+	log.Println(fields)
 	for _, v := range r.Matches {
 		var (
 			item     = make(map[string]interface{})
@@ -272,35 +321,6 @@ func (r *SearchResult) Filter(keys ...string) []map[string]interface{} {
 	}
 	r.FilterCache = filtered
 	return filtered
-}
-
-// Statistics counts data by specified fields from search results
-func (r *SearchResult) Statistics(keys ...string) map[string]map[string]int {
-	var (
-		counts     = make(map[string]map[string]int)
-		fields, ok = statisticsFields[r.Type]
-	)
-	if !ok {
-		return counts
-	}
-	for _, k := range keys {
-		k = strings.ToLower(strings.TrimSpace(k))
-		field, ok := fields[k]
-		if !ok {
-			continue
-		}
-		if _, ok := counts[k]; !ok {
-			counts[k] = make(map[string]int)
-		}
-		for _, v := range r.Matches {
-			name := v.FindString(field)
-			if name == "" {
-				name = "[unknown]"
-			}
-			counts[k][name]++
-		}
-	}
-	return counts
 }
 
 // Extend merges more than one search results
