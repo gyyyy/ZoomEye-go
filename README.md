@@ -6,7 +6,7 @@
 
 ### 下载安装
 
-- 在 [Releases](https://github.com/shadowsocks/go-shadowsocks2/releases) 中获得已经编译好的二进制文件
+- 在 [Releases](https://github.com/gyyyy/ZoomEye-go/releases) 中获得已经编译好的二进制文件
 
 - 直接通过Github下载源代码，或运行 `go get` 进行下载安装：
 
