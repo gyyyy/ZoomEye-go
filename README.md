@@ -44,11 +44,11 @@ EXPIRED_TIME: 432000
 
 1. API-Key (推荐)
 
-    ./ZoomEye-go init -apikey [API-KEY]
+       ./ZoomEye-go init -apikey [API-KEY]
 
 1. JWT
 
-    ./ZoomEye-go init -username [USERNAME] -password [PASSWORD]
+       ./ZoomEye-go init -username [USERNAME] -password [PASSWORD]
 
 使用示例：
 
