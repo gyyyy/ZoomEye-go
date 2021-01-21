@@ -244,14 +244,17 @@ func printFilter(result *zoomeye.SearchResult, keys []string) {
 		body    = make([]map[string]interface{}, len(filters))
 	)
 	for i, filt := range filters {
-		index := filt["index"].(string)
-		delete(filt, "index")
-		items := make([]map[string]interface{}, 0, len(filt))
+		var (
+			index = filt["_index"].(string)
+			items = make([]map[string]interface{}, 0, len(filt)-1)
+		)
 		for k, v := range filt {
-			items = append(items, map[string]interface{}{
-				"key":   strings.ToTitle(k),
-				"value": omitStr(convertStr(dataToString(v)), 75),
-			})
+			if k != "_index" {
+				items = append(items, map[string]interface{}{
+					"key":   strings.ToTitle(k),
+					"value": omitStr(convertStr(dataToString(v)), 75),
+				})
+			}
 		}
 		body[i] = map[string]interface{}{
 			"name":  omitStr(index, 30),

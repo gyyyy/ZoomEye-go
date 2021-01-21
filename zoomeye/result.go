@@ -11,7 +11,7 @@ import (
 var (
 	filterFields = map[string]map[string]string{
 		"host": map[string]string{
-			"index":      "ip",
+			"_index":     "ip",
 			"app":        "portinfo.app",
 			"version":    "portinfo.version",
 			"device":     "portinfo.device",
@@ -26,7 +26,7 @@ var (
 			"banner":     "portinfo.banner",
 		},
 		"web": map[string]string{
-			"index":      "site",
+			"_index":     "site",
 			"app":        "webapp",
 			"headers":    "headers",
 			"keywords":   "keywords",
@@ -230,7 +230,7 @@ func (r *SearchResult) Filter(keys ...string) []map[string]interface{} {
 			keys = append(keys, k)
 		}
 	}
-	keys = append(keys, "index")
+	keys = append(keys, "_index")
 	for _, v := range r.Matches {
 		var (
 			item     = make(map[string]interface{})
@@ -254,7 +254,7 @@ func (r *SearchResult) Filter(keys ...string) []map[string]interface{} {
 				continue
 			}
 			find := v.Find(field)
-			if k != "index" && find != nil {
+			if k != "_index" && find != nil {
 				if expr == "" {
 					count++
 				} else if reg, err := regexp.Compile(expr); err == nil && reg.MatchString(v.FindString(field)) {
