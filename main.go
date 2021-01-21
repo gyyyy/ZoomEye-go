@@ -20,6 +20,7 @@ func help() {
 		"  init\n        Initialize ZoomEye by username/password or API-Key\n"+
 		"  info\n        Query resources information\n"+
 		"  search\n        Search results from local, cache or API\n"+
+		"  clean\n        Removes all cache data\n"+
 		"  help\n        Usage of ZoomEye-go\n",
 		filepath.Base(os.Args[0]))
 }
@@ -45,6 +46,8 @@ func main() {
 		cmdInfo(agent)
 	case "search":
 		cmdSearch(agent)
+	case "clean":
+		agent.Clean()
 	case "help", "-help", "--help", "-h", "?":
 		help()
 	default:

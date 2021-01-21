@@ -295,6 +295,11 @@ func (a *ZoomEyeAgent) Save(result *zoomeye.SearchResult, name string) (string, 
 	return path, nil
 }
 
+// Clean removes all cache data
+func (a *ZoomEyeAgent) Clean() {
+	os.RemoveAll(a.conf.CachePath)
+}
+
 // NewAgent creates instance of ZoomEyeAgent
 func NewAgent() *ZoomEyeAgent {
 	return &ZoomEyeAgent{
