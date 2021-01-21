@@ -11,6 +11,7 @@ import (
 var (
 	filterFields = map[string]map[string]string{
 		"host": map[string]string{
+			"index":      "ip",
 			"app":        "portinfo.app",
 			"version":    "portinfo.version",
 			"device":     "portinfo.device",
@@ -25,6 +26,7 @@ var (
 			"banner":     "portinfo.banner",
 		},
 		"web": map[string]string{
+			"index":      "site",
 			"app":        "webapp",
 			"headers":    "headers",
 			"keywords":   "keywords",
@@ -231,8 +233,9 @@ func (r *SearchResult) Filter(keys ...string) []map[string]interface{} {
 	keys = append(keys, "index")
 	for _, v := range r.Matches {
 		var (
-			item    = make(map[string]interface{})
-			matched bool
+			item     = make(map[string]interface{})
+			count    int
+			notMatch bool
 		)
 		for _, k := range keys {
 			var expr string
@@ -245,26 +248,25 @@ func (r *SearchResult) Filter(keys ...string) []map[string]interface{} {
 			k = strings.ToLower(strings.TrimSpace(k))
 			field, ok := fields[k]
 			if !ok {
-				if k != "index" {
-					continue
-				}
-				if field = "ip"; r.Type == "web" {
-					field = "site"
-				}
+				continue
 			}
 			if _, ok = item[k]; ok {
 				continue
 			}
 			find := v.Find(field)
-			if matched = find != nil && expr == ""; find != nil && expr != "" {
-				reg, err := regexp.Compile(expr)
-				if matched = err != nil || reg.MatchString(v.FindString(field)); !matched {
+			if k != "index" && find != nil {
+				if expr == "" {
+					count++
+				} else if reg, err := regexp.Compile(expr); err == nil && reg.MatchString(v.FindString(field)) {
+					count++
+				} else {
+					notMatch = true
 					break
 				}
 			}
 			item[k] = find
 		}
-		if matched {
+		if !notMatch && count > 0 {
 			filtered = append(filtered, item)
 		}
 	}

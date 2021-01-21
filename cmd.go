@@ -60,22 +60,22 @@ func cmdSearch(agent *ZoomEyeAgent) {
 		dork     string
 		num      int
 		resource string
-		facet    string
 		force    bool
-		save     bool
 		count    bool
-		filter   string
+		facet    string
 		stat     string
+		filter   string
+		save     bool
 	}
 	flag.StringVar(&args.dork, "dork", "", "The ZoomEye search keyword or ZoomEye exported file")
 	flag.IntVar(&args.num, "num", 20, "The number of search results that should be returned, multiple of 20")
 	flag.StringVar(&args.resource, "type", "host", "Specify the type of resource to search")
-	flag.StringVar(&args.facet, "facet", "", "Perform statistics on ZoomEye database")
 	flag.BoolVar(&args.force, "force", false, "Ignore local and cache data")
-	flag.BoolVar(&args.save, "save", false, "Save the search results in JSON format")
 	flag.BoolVar(&args.count, "count", false, "The total number of results in ZoomEye database for a search")
-	flag.StringVar(&args.filter, "filter", "", "Output more clearer search results by set filter field")
+	flag.StringVar(&args.facet, "facet", "", "Perform statistics on ZoomEye database")
 	flag.StringVar(&args.stat, "stat", "", "Perform statistics on search results")
+	flag.StringVar(&args.filter, "filter", "", "Output more clearer search results by set filter field")
+	flag.BoolVar(&args.save, "save", false, "Save the search results in JSON format")
 	if flag.Parse(); args.dork == "" {
 		warnf("input parameter error, please run <zoomeye search -h> for help")
 		return
