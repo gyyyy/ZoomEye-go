@@ -1,0 +1,11 @@
+# api key and json web token file path
+ZOOMEYE_CONFIG_PATH: "~/.config/zoomeye/setting"
+
+# search cache data path
+ZOOMEYE_CACHE_PATH: "~/.config/zoomeye/cache"
+
+# search save data path
+ZOOMEYE_DATA_PATH: "data"
+
+# data expired time, default five day
+EXPIRED_TIME: 432000

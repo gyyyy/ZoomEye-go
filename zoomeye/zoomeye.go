@@ -1,0 +1,203 @@
+package zoomeye
+
+import (
+	"bytes"
+	"crypto/tls"
+	"encoding/json"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"strings"
+)
+
+const (
+	loginAPI    = "https://api.zoomeye.org/user/login"
+	userinfoAPI = "https://api.zoomeye.org/resources-info"
+	searchAPI   = "https://api.zoomeye.org/%s/search"
+	historyAPI  = "https://api.zoomeye.org/both/search?history=true&ip=%s"
+)
+
+var httpCli = &http.Client{
+	Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+	},
+}
+
+var defaultFacets = map[string]string{
+	"host": "app,device,service,os,port,country,city",
+	"web":  "webapp,component,framework,frontend,server,waf,os,country,city",
+}
+
+// ZoomEye represents SDK for using
+type ZoomEye struct {
+	apiKey      string
+	accessToken string
+}
+
+func (z *ZoomEye) request(method, u string, body io.Reader, result Result) error {
+	req, err := http.NewRequest(method, u, body)
+	if z.apiKey != "" {
+		req.Header.Set("API-KEY", z.apiKey)
+	}
+	if z.accessToken != "" {
+		req.Header.Set("Authorization", "JWT "+z.accessToken)
+	}
+	resp, err := httpCli.Do(req)
+	if err != nil {
+		return err
+	}
+	b, err := ioutil.ReadAll(resp.Body)
+	if resp.Body.Close(); err != nil {
+		return err
+	}
+	if resp.StatusCode != 200 {
+		e := &ErrorResult{}
+		if err = json.Unmarshal(b, &e); err != nil {
+			return err
+		}
+		return e
+	}
+	if err = json.Unmarshal(b, result); err != nil {
+		return err
+	}
+	result.setRawData(b)
+	return nil
+}
+
+func (z *ZoomEye) get(u string, params map[string]interface{}, result Result) error {
+	if params != nil {
+		uu, err := url.Parse(u)
+		if err != nil {
+			return err
+		}
+		query := uu.Query()
+		for k, v := range params {
+			query.Add(k, fmt.Sprintf("%v", v))
+		}
+		uu.RawQuery = query.Encode()
+		u = uu.String()
+	}
+	return z.request(http.MethodGet, u, nil, result)
+}
+
+func (z *ZoomEye) post(u string, headers map[string]string, data map[string]interface{}, result Result) error {
+	var body io.Reader
+	if data != nil {
+		b, err := json.Marshal(data)
+		if err != nil {
+			return err
+		}
+		body = bytes.NewBuffer(b)
+	}
+	return z.request(http.MethodPost, u, body, result)
+}
+
+// Login uses username/password for authentication
+func (z *ZoomEye) Login(username, password string) (string, error) {
+	var (
+		data = map[string]interface{}{
+			"username": username,
+			"password": password,
+		}
+		result = &LoginResult{}
+	)
+	if err := z.post(loginAPI, nil, data, result); err != nil {
+		return "", err
+	}
+	z.accessToken = result.AccessToken
+	return z.accessToken, nil
+}
+
+// ResourcesInfo gets account resource information
+func (z *ZoomEye) ResourcesInfo() (*ResourcesInfoResult, error) {
+	var (
+		result = &ResourcesInfoResult{}
+		err    = z.get(userinfoAPI, nil, result)
+	)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// DorkSearch searches the data of the specified page according to dork
+func (z *ZoomEye) DorkSearch(dork string, page int, resource string, facet string) (*SearchResult, error) {
+	if page <= 0 {
+		page = 1
+	}
+	if resource != "" {
+		resource = strings.ToLower(resource)
+	} else {
+		resource = "host"
+	}
+	if facet == "" {
+		facet = defaultFacets[resource]
+	}
+	var (
+		params = map[string]interface{}{
+			"query":  dork,
+			"page":   page,
+			"facets": facet,
+		}
+		result = &SearchResult{
+			Type: resource,
+		}
+		err = z.get(fmt.Sprintf(searchAPI, resource), params, result)
+	)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// MultiPageSearch searches multiple pages of data according to dork
+func (z *ZoomEye) MultiPageSearch(dork string, maxPage int, resource string, facet string) (*SearchResult, error) {
+	if maxPage <= 0 {
+		maxPage = 1
+	}
+	if resource != "" {
+		resource = strings.ToLower(resource)
+	} else {
+		resource = "host"
+	}
+	result := &SearchResult{
+		Type: resource,
+	}
+	for i := 0; i < maxPage; i++ {
+		res, err := z.DorkSearch(dork, i+1, resource, facet)
+		if err != nil {
+			return nil, err
+		}
+		result.Extend(res)
+	}
+	return result, nil
+}
+
+// HistoryIP queries IP history information
+func (z *ZoomEye) HistoryIP(ip string) (*HistoryResult, error) {
+	var (
+		result = &HistoryResult{}
+		err    = z.get(fmt.Sprintf(historyAPI, ip), nil, result)
+	)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// NewWithKey creates instance of ZoomEye with API-Key and AccessToken
+func NewWithKey(apiKey, accessToken string) *ZoomEye {
+	return &ZoomEye{
+		apiKey:      apiKey,
+		accessToken: accessToken,
+	}
+}
+
+// New creates instance of ZoomEye
+func New() *ZoomEye {
+	return &ZoomEye{}
+}
