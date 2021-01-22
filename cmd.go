@@ -70,7 +70,7 @@ func cmdSearch(agent *ZoomEyeAgent) {
 		filter   string
 		save     bool
 	}
-	flag.StringVar(&args.dork, "dork", "", "The ZoomEye search keyword or ZoomEye exported file")
+	flag.StringVar(&args.dork, "dork", "", "[REQUIRED] The ZoomEye search keyword or ZoomEye exported file")
 	flag.IntVar(&args.num, "num", 20, "The number of search results that should be returned, multiple of 20")
 	flag.StringVar(&args.resource, "type", "host", "Specify the type of resource to search")
 	flag.BoolVar(&args.force, "force", false, "Ignore local and cache data")

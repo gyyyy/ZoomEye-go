@@ -151,6 +151,9 @@ func (z *ZoomEye) DorkSearch(dork string, page int, resource string, facet strin
 	if err != nil {
 		return nil, err
 	}
+	if len(result.Matches) == 0 {
+		return nil, fmt.Errorf("no any results for the dork")
+	}
 	return result, nil
 }
 
@@ -164,15 +167,21 @@ func (z *ZoomEye) MultiPageSearch(dork string, maxPage int, resource string, fac
 	} else {
 		resource = "host"
 	}
-	result := &SearchResult{
-		Type: resource,
-	}
+	var (
+		result = &SearchResult{
+			Type: resource,
+		}
+		err error
+	)
 	for i := 0; i < maxPage; i++ {
-		res, err := z.DorkSearch(dork, i+1, resource, facet)
-		if err != nil {
-			return nil, err
+		var res *SearchResult
+		if res, err = z.DorkSearch(dork, i+1, resource, facet); err != nil {
+			break
 		}
 		result.Extend(res)
+	}
+	if err != nil && len(result.Matches) == 0 {
+		return nil, err
 	}
 	return result, nil
 }
