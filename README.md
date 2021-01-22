@@ -69,7 +69,7 @@ succeed to initialize
 
 #### 查询用户资源信息
 
-通过 `info` 命令可以查询当前用户个人信息以及数据配额，初始化成功后也会自动查询：
+通过 `info` 命令可以查询 `ZoomEye` 当前用户个人信息以及数据配额，初始化成功后也会自动查询：
 
 ```bash
 ./ZoomEye-go info
@@ -100,12 +100,12 @@ succeed to query
 
 根据搜索资源类型的不同（由参数 `-type` 确定），其他部分参数值范围存在差异，并且可能根据 `ZoomEye` 官方更新而改变：
 
-- `-facet`与`-stat`，它们取值一样，只是统计的数据集范围不同
-    - 当 `-type` 为 `host`时，可以使用 `app,device,service,os,port,country,city`
-    - 当 `-type` 为 `web`时，可以使用 `webapp,component,framework,frontend,server,waf,os,country,city`
+- `-facet` 与 `-stat` ，它们取值一样，只是统计的数据集范围不同
+    - 当 `-type` 为 `host` 时，可以使用 `app,device,service,os,port,country,city`
+    - 当 `-type` 为 `web` 时，可以使用 `webapp,component,framework,frontend,server,waf,os,country,city`
 - `-filter`
-    - 当 `-type` 为 `host`时，可以使用 `app,version,device,ip,port,hostname,city,city_cn,country,country_cn,asn,banner`
-    - 当 `-type` 为 `web`时，可以使用 `app,headers,keywords,title,ip,site,city,city_cn,country,country_cn`
+    - 当 `-type` 为 `host` 时，可以使用 `app,version,device,ip,port,hostname,city,city_cn,country,country_cn,asn,banner`
+    - 当 `-type` 为 `web` 时，可以使用 `app,headers,keywords,title,ip,site,city,city_cn,country,country_cn`
 
 使用示例：
 
@@ -137,6 +137,12 @@ succeed to search (in 272.080753ms)
 `ZoomEye-go` 参考官方 `ZoomEye-python` 的设计，在命令行模式下提供了相似的缓存机制，数据默认存储在 `~/.config/zoomeye/cache` 目录，尽可能节约用户配额。搜索过的数据将默认在本地缓存 5 天，在缓存数据有效期内，重复执行同条件搜索不会消耗配额。可以设置 `-force` 参数强制调用 `ZoomEye API` 进行搜索，结果会覆盖当前缓存数据。
 
 通过 `clean` 命令可以清空所有缓存数据。
+
+#### 加载分析本地数据
+
+`ZoomEye-go` 也可以通过 `load` 命令加载本地数据，并将它解析成搜索结果数据类型，支持与 `search` 命令类似的 `-count` 、 `-facet` 、 `-stat` 和 `-filter` 参数对数据进行统计分析，不同的是，`-save` 参数仅会保存 `-filter` 的执行结果。
+
+可以通过 `load -h` 获取帮助。
 
 ### 使用SDK API
 

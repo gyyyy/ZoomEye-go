@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -34,7 +35,7 @@ func cmdInit(agent *ZoomEyeAgent) {
 			return
 		}
 	} else if result, err = agent.InitLocal(); err != nil {
-		warnf("input parameter error, please run <zoomeye init -h> for help")
+		warnf("required parameter missing, please run <zoomeye init -h> for help")
 		return
 	}
 	successf("succeed to initialize")
@@ -46,7 +47,7 @@ func cmdInfo(agent *ZoomEyeAgent) {
 	if err != nil {
 		switch err.(type) {
 		case *NoAuthKeyErr:
-			warnf("not found any Auth Key, please run <zoomeye init> first")
+			warnf("not found any Auth Keys, please run <zoomeye init> first")
 		case *zoomeye.ErrorResult:
 			errorf("failed to authenticate: %v", err)
 		default:
@@ -80,7 +81,7 @@ func cmdSearch(agent *ZoomEyeAgent) {
 	flag.StringVar(&args.filter, "filter", "", "Output more clearer search results by set filter field")
 	flag.BoolVar(&args.save, "save", false, "Save the search results in JSON format")
 	if flag.Parse(); args.dork == "" {
-		warnf("input parameter error, please run <zoomeye search -h> for help")
+		warnf("required parameter missing, please run <zoomeye search -h> for help")
 		return
 	}
 	var (
@@ -91,7 +92,7 @@ func cmdSearch(agent *ZoomEyeAgent) {
 	if err != nil {
 		switch err.(type) {
 		case *NoAuthKeyErr:
-			warnf("not found any Auth Key, please run <zoomeye init> first")
+			warnf("not found any Auth Keys, please run <zoomeye init> first")
 		case *zoomeye.ErrorResult:
 			errorf("failed to authenticate: %v", err)
 		default:
@@ -112,7 +113,7 @@ func cmdSearch(agent *ZoomEyeAgent) {
 	if args.filter != "" {
 		printFilter(result, strings.Split(args.filter, ","))
 	}
-	if args.facet == "" && args.stat == "" && args.filter == "" {
+	if !args.count && args.facet == "" && args.stat == "" && args.filter == "" {
 		printData(result)
 	}
 	if args.save {
@@ -120,6 +121,60 @@ func cmdSearch(agent *ZoomEyeAgent) {
 		if path, err := agent.Save(result, name); err != nil {
 			errorf("failed to save: %v", err)
 		} else {
+			successf("succeed to save (%s)", path)
+		}
+	}
+}
+
+func cmdLoad(agent *ZoomEyeAgent) {
+	var args struct {
+		file   string
+		count  bool
+		facet  string
+		stat   string
+		filter string
+		save   bool
+	}
+	flag.StringVar(&args.file, "file", "", "[REQUIRED] The path of local data")
+	flag.BoolVar(&args.count, "count", false, "The total number of results in ZoomEye database in local data")
+	flag.StringVar(&args.facet, "facet", "", "Perform statistics on ZoomEye database in local data")
+	flag.StringVar(&args.stat, "stat", "", "Perform statistics in local data")
+	flag.StringVar(&args.filter, "filter", "", "Output more clearer results by set filter field in local data")
+	flag.BoolVar(&args.save, "save", false, "Save the filter data in JSON format")
+	if flag.Parse(); args.file == "" {
+		warnf("required parameter missing, please run <zoomeye load -h> for help")
+		return
+	}
+	result, err := agent.Load(args.file)
+	if err != nil {
+		errorf("invalid local data: %v", err)
+		return
+	}
+	successf("succeed to load")
+	if args.count {
+		infof("Total Count", "Count: %d", result.Total)
+	}
+	if args.facet != "" {
+		printFacet(result, strings.Split(args.facet, ","))
+	}
+	if args.stat != "" {
+		printStat(result, strings.Split(args.stat, ","))
+	}
+	if args.filter != "" {
+		printFilter(result, strings.Split(args.filter, ","))
+	}
+	if !args.count && args.facet == "" && args.stat == "" && args.filter == "" {
+		printData(result)
+	}
+	if args.save {
+		var (
+			ext  = filepath.Ext(args.file)
+			path = strings.TrimSuffix(args.file, ext) + "_filtered" + ext
+		)
+		if err := agent.SaveFilterData(result.FilterCache, path); err != nil {
+			errorf("failed to save: %v", err)
+		} else {
+			path, _ = filepath.Abs(path)
 			successf("succeed to save (%s)", path)
 		}
 	}

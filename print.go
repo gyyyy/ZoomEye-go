@@ -306,7 +306,7 @@ func printData(result *zoomeye.SearchResult) {
 		)
 		for i, v := range result.Matches {
 			body[i] = []interface{}{
-				v.FindString("ip") + ":" + v.FindString("portinfo.port"),
+				omitStr(v.FindString("ip")+":"+v.FindString("portinfo.port"), 21),
 				omitStr(v.FindString("portinfo.app"), 20),
 				omitStr(v.FindString("portinfo.service"), 20),
 				omitStr(convertStr(v.FindString("portinfo.banner")), 40),

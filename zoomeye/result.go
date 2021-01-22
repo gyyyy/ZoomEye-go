@@ -3,7 +3,6 @@ package zoomeye
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"reflect"
 	"regexp"
 	"strings"
@@ -279,7 +278,6 @@ func (r *SearchResult) Filter(keys ...string) []map[string]interface{} {
 		}
 	}
 	keys = append(keys, "_index")
-	log.Println(fields)
 	for _, v := range r.Matches {
 		var (
 			item     = make(map[string]interface{})

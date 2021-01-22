@@ -14,7 +14,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// NoAuthKeyErr represents error of no any Auth Key
+// NoAuthKeyErr represents error of no any Auth Keys
 type NoAuthKeyErr struct {
 	err error
 }
@@ -303,6 +303,18 @@ func (a *ZoomEyeAgent) Search(dork string, num int, resource string, force bool)
 	return result, nil
 }
 
+// SaveFilterData writes the filter data to local file
+func (a *ZoomEyeAgent) SaveFilterData(data []map[string]interface{}, path string) error {
+	if data == nil || len(data) == 0 {
+		return fmt.Errorf("no any filter datas")
+	}
+	b, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	return writeFile(path, b)
+}
+
 // Save writes the search results (and filter data) to local file
 func (a *ZoomEyeAgent) Save(result *zoomeye.SearchResult, name string) (string, error) {
 	var (
@@ -315,13 +327,30 @@ func (a *ZoomEyeAgent) Save(result *zoomeye.SearchResult, name string) (string, 
 	if err = writeFile(path, data); err != nil {
 		return "", err
 	}
-	if len(result.FilterCache) > 0 {
-		if data, err = json.Marshal(result.FilterCache); err == nil {
-			writeFile(filepath.Join(a.conf.DataPath, name+"_filtered.json"), data)
-		}
-	}
+	a.SaveFilterData(result.FilterCache, filepath.Join(a.conf.DataPath, name+"_filtered.json"))
 	path, _ = filepath.Abs(path)
 	return path, nil
+}
+
+// Load reads local data, and unmarshals to search results
+func (a *ZoomEyeAgent) Load(path string) (*zoomeye.SearchResult, error) {
+	if _, err := os.Stat(path); err != nil {
+		return nil, err
+	}
+	b, err := readFile(path)
+	if err != nil {
+		return nil, err
+	}
+	result := &zoomeye.SearchResult{
+		Type: "host",
+	}
+	if err = json.Unmarshal(b, result); err != nil {
+		return nil, err
+	}
+	if len(result.Matches) > 0 && result.Matches[0].Find("site") != nil {
+		result.Type = "web"
+	}
+	return result, nil
 }
 
 // Clean removes all cache data

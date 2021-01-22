@@ -46,6 +46,8 @@ func main() {
 		cmdInfo(agent)
 	case "search":
 		cmdSearch(agent)
+	case "load":
+		cmdLoad(agent)
 	case "clean":
 		agent.Clean()
 		successf("succeed to clean all cache data")
