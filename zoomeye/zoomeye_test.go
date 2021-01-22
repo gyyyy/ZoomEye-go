@@ -56,14 +56,24 @@ func TestDorkSearch(t *testing.T) {
 
 func TestMultiPageSearch(t *testing.T) {
 	var (
+		maxPage      = 2
+		results, err = defaultZoom.MultiPageSearch("dedecms country:cn", maxPage, "web", "")
+	)
+	if err != nil || (len(results) == 0) {
+		t.FailNow()
+	}
+	t.Log(results[1].Total, results[1].Type)
+}
+
+func TestMultiToOneSearch(t *testing.T) {
+	var (
 		maxPage     = 2
-		result, err = defaultZoom.MultiPageSearch("dedecms country:cn", maxPage, "web", "")
+		result, err = defaultZoom.MultiToOneSearch("dedecms country:cn", maxPage, "web", "")
 	)
 	if err != nil || (len(result.Matches) != maxPage*20) {
 		t.FailNow()
 	}
 	t.Log(result.Total, result.Type)
-	t.Log(result)
 }
 
 func TestFilter(t *testing.T) {

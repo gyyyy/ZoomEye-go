@@ -134,7 +134,7 @@ succeed to search (in 272.080753ms)
 
 #### 缓存机制
 
-`ZoomEye-go` 参考官方 `ZoomEye-python` 的设计，在命令行模式下提供了相似的缓存机制，数据默认存储在 `~/.config/zoomeye/cache` 目录，尽可能节约用户配额。搜索过的数据将默认在本地缓存 5 天，在缓存数据有效期内，重复执行同条件搜索不会消耗配额。可以设置 `-force` 参数强制调用 `ZoomEye API` 进行搜索，但结果不会覆盖当前缓存数据。
+`ZoomEye-go` 参考官方 `ZoomEye-python` 的设计，在命令行模式下提供了相似的缓存机制，数据默认存储在 `~/.config/zoomeye/cache` 目录，尽可能节约用户配额。搜索过的数据将默认在本地缓存 5 天，在缓存数据有效期内，重复执行同条件搜索不会消耗配额。可以设置 `-force` 参数强制调用 `ZoomEye API` 进行搜索，结果会覆盖当前缓存数据。
 
 通过 `clean` 命令可以清空所有缓存数据。
 
@@ -161,8 +161,10 @@ func main() {
 
 	// 搜索
 	result, _ := zoom.DorkSearch("port:80 nginx", 1, "host", "app,service,os")
-	// 多页搜索
-	// result, _ := zoom.MultiPageSearch("wordpress country:cn", 5, "web", "webapp,server,os")
+	// 多页搜索，5页（100条）以上会进行并发搜索，减少搜索耗时
+  // results, _ := zoom.MultiPageSearch("wordpress country:cn", 5, "web", "webapp,server,os")
+  // 多页搜索（结果合并）
+	// result, _ := zoom.MultiToOneSearch("wordpress country:cn", 5, "web", "webapp,server,os")
 
 	// 对搜索结果进行统计
 	stat := result.Statistics("app,service,os")
@@ -170,7 +172,7 @@ func main() {
 	// 对搜索结果进行筛选
 	filt := result.Filter("app,ip,title")
 
-	// 设备历史搜索（需要高级用户或VIP用户权限）
+	// 设备历史搜索（需要高级用户或VIP用户权限，结果包含多少条记录就会扣多少额度，非土豪慎用）
 	history, _ := zoom.HistoryIP("1.2.3.4")
 }
 ```
@@ -178,7 +180,6 @@ func main() {
 ### TODO
 
 - 实现交互式命令行模式
-- 优化多页搜索
 
 ---
 

@@ -48,6 +48,7 @@ func main() {
 		cmdSearch(agent)
 	case "clean":
 		agent.Clean()
+		successf("succeed to clean all cache data")
 	case "help", "-help", "--help", "-h", "?":
 		help()
 	default:

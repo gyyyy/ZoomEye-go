@@ -80,8 +80,12 @@ func newConfig() *config {
 	return conf
 }
 
-func hash(s string) string {
-	return fmt.Sprintf("%x", md5.Sum([]byte(s)))
+func filename(resource, dork string, n int, enc bool) string {
+	name := fmt.Sprintf("%s_%s_%d", resource, dork, n)
+	if enc {
+		name = fmt.Sprintf("%x", md5.Sum([]byte(name)))
+	}
+	return name + ".json"
 }
 
 // ZoomEyeAgent represents agent of ZoomEye
@@ -186,8 +190,10 @@ func (a *ZoomEyeAgent) fromLocal(name string) (*zoomeye.SearchResult, bool) {
 		return nil, false
 	}
 	result := &zoomeye.SearchResult{}
-	err = json.Unmarshal(b, result)
-	return result, err == nil
+	if err = json.Unmarshal(b, result); err != nil {
+		return nil, false
+	}
+	return result, true
 }
 
 func (a *ZoomEyeAgent) hasCached(path string) bool {
@@ -249,16 +255,24 @@ func (a *ZoomEyeAgent) Search(dork string, num int, resource string, force bool)
 		maxPage++
 	}
 	if force {
-		result, err := a.zoom.MultiPageSearch(dork, maxPage, resource, "")
+		results, err := a.zoom.MultiPageSearch(dork, maxPage, resource, "")
 		if err != nil {
 			return nil, err
 		}
-		if num < len(result.Matches) {
-			result.Matches = result.Matches[:num]
+		result := &zoomeye.SearchResult{
+			Type: resource,
+		}
+		for i, n := 0, len(results); i < maxPage && n > 0; i++ {
+			page := i + 1
+			if res, ok := results[page]; ok {
+				a.cache(filename(resource, dork, page, true), res)
+				result.Extend(res)
+				n--
+			}
 		}
 		return result, nil
 	}
-	result, ok := a.fromLocal(fmt.Sprintf("%s_%s_%d", resource, url.QueryEscape(dork), num))
+	result, ok := a.fromLocal(filename(resource, url.QueryEscape(dork), num, false))
 	if ok {
 		result.Type = resource
 		return result, nil
@@ -270,7 +284,7 @@ func (a *ZoomEyeAgent) Search(dork string, num int, resource string, force bool)
 		var (
 			res  = &zoomeye.SearchResult{}
 			page = i + 1
-			name = hash(fmt.Sprintf("%s_%s_%d", resource, dork, page)) + ".json"
+			name = filename(resource, dork, page, true)
 		)
 		if res, ok = a.fromCache(name); !ok {
 			var err error
