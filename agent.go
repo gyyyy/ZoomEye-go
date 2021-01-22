@@ -14,6 +14,21 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// NoAuthKeyErr represents error of no any Auth Key
+type NoAuthKeyErr struct {
+	err error
+}
+
+func (e *NoAuthKeyErr) Error() string {
+	return e.err.Error()
+}
+
+func noAuthKey(err error) *NoAuthKeyErr {
+	return &NoAuthKeyErr{
+		err: err,
+	}
+}
+
 type config struct {
 	ConfigPath string `yaml:"ZOOMEYE_CONFIG_PATH"`
 	CachePath  string `yaml:"ZOOMEYE_CACHE_PATH"`
@@ -117,14 +132,14 @@ func (a *ZoomEyeAgent) loadAuthKey(name string) (string, error) {
 		info, err = os.Stat(path)
 	)
 	if err != nil {
-		return "", err
+		return "", noAuthKey(err)
 	}
 	if !strings.HasSuffix(fmt.Sprintf("%o", info.Mode()), "600") {
 		os.Chmod(path, 0o600)
 	}
 	b, err := readFile(path)
 	if err != nil {
-		return "", err
+		return "", noAuthKey(err)
 	}
 	return string(b), nil
 }
@@ -138,7 +153,7 @@ func (a *ZoomEyeAgent) InitLocal() (*zoomeye.ResourcesInfoResult, error) {
 	)
 	if apiKey, err = a.loadAuthKey("apikey"); err != nil {
 		if accessToken, err = a.loadAuthKey("jwt"); err != nil {
-			return nil, fmt.Errorf("cannot find any valid Auth Key file")
+			return nil, err
 		}
 	}
 	zoom := zoomeye.NewWithKey(apiKey, accessToken)

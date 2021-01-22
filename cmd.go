@@ -44,9 +44,12 @@ func cmdInit(agent *ZoomEyeAgent) {
 func cmdInfo(agent *ZoomEyeAgent) {
 	result, err := agent.Info()
 	if err != nil {
-		if _, ok := err.(*zoomeye.ErrorResult); ok {
+		switch err.(type) {
+		case *NoAuthKeyErr:
+			warnf("not found any Auth Key, please run <zoomeye init> first")
+		case *zoomeye.ErrorResult:
 			errorf("failed to authenticate: %v", err)
-		} else {
+		default:
 			errorf("something is wrong: %v", err)
 		}
 		return
@@ -86,9 +89,12 @@ func cmdSearch(agent *ZoomEyeAgent) {
 		since       = time.Since(start)
 	)
 	if err != nil {
-		if _, ok := err.(*zoomeye.ErrorResult); ok {
+		switch err.(type) {
+		case *NoAuthKeyErr:
+			warnf("not found any Auth Key, please run <zoomeye init> first")
+		case *zoomeye.ErrorResult:
 			errorf("failed to authenticate: %v", err)
-		} else {
+		default:
 			errorf("something is wrong: %v", err)
 		}
 		return
