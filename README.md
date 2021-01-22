@@ -178,8 +178,18 @@ func main() {
 ### TODO
 
 - 实现交互式命令行模式
-- 多页搜索优化
+- 优化多页搜索
 
 ---
 
-如遇到问题或Bug请提Issues，欢迎PR。
+### 404StarLink 2.0 - Galaxy
+
+![404StarLink Logo](https://github.com/knownsec/404StarLink-Project/raw/master/logo.png)
+
+`ZoomEye-go` 是 404Team [星链计划2.0](https://github.com/knownsec/404StarLink2.0-Galaxy) 中的一环，如果对 `ZoomEye-go` 有任何疑问又或是想要找小伙伴交流，可以参考星链计划的加群方式。
+
+- [https://github.com/knownsec/404StarLink2.0-Galaxy#community](https://github.com/knownsec/404StarLink2.0-Galaxy#community)
+
+---
+
+如果发现Bug请提Issues，欢迎PR。
