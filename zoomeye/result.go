@@ -208,9 +208,9 @@ func (r *SearchResult) Hosts() []map[string]string {
 }
 
 // Statistics counts data by specified fields from search results
-func (r *SearchResult) Statistics(keys ...string) map[string]map[string]int {
+func (r *SearchResult) Statistics(keys ...string) map[string]map[string]uint64 {
 	var (
-		counts     = make(map[string]map[string]int)
+		counts     = make(map[string]map[string]uint64)
 		fields, ok = statisticsFields[r.Type]
 	)
 	if !ok {
@@ -223,7 +223,7 @@ func (r *SearchResult) Statistics(keys ...string) map[string]map[string]int {
 			continue
 		}
 		if _, ok := counts[k]; !ok {
-			counts[k] = make(map[string]int)
+			counts[k] = make(map[string]uint64)
 		}
 		for _, v := range r.Matches {
 			switch s := v.Find(field).(type) {

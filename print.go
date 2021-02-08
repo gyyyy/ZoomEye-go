@@ -3,6 +3,8 @@ package main
 import (
 	"ZoomEye-go/zoomeye"
 	"fmt"
+	"math"
+	"sort"
 	"strings"
 )
 
@@ -15,10 +17,21 @@ var (
 		'\r': "\\r",
 	}
 	colors = map[string]string{
-		"red":    "\033[91m",
-		"green":  "\033[92m",
-		"yellow": "\033[93m",
-		"white":  "\033[97m",
+		"black":  "\033[0;30m",
+		"red":    "\033[0;31m",
+		"green":  "\033[0;32m",
+		"yellow": "\033[0;33m",
+		"blue":   "\033[0;34m",
+		"purple": "\033[0;35m",
+		"cyan":   "\033[0;36m",
+		"white":  "\033[0;37m",
+	}
+	pieColors = []string{
+		"\033[1;34m", "\033[1;35m", "\033[1;36m", "\033[1;31m", "\033[1;33m",
+		"\033[0;94m", "\033[0;95m", "\033[0;96m", "\033[0;91m", "\033[0;93m",
+	}
+	histChars = []string{
+		" ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█",
 	}
 )
 
@@ -43,8 +56,8 @@ func warnf(format string, a ...interface{}) {
 }
 
 func infof(title, format string, a ...interface{}) {
-	if format = strings.ReplaceAll(format, "\n", "\n  "); title != "" {
-		format = "\n[" + title + "]\n\n  " + format + "\n"
+	if title != "" {
+		format = "\n\033[1;36m[" + title + "]\n\n  \033[1;37m" + strings.ReplaceAll(format, "\n", "\n  ") + "\n"
 	}
 	print(fmt.Sprintf(format, a...), "")
 }
@@ -55,7 +68,8 @@ func tablef(title string, head [][2]interface{}, body map[string][][]interface{}
 		n       = len(head)
 		names   = make([]interface{}, 0, n)
 		widths  = make([]int, 0, n)
-		format  = "|"
+		hfmt    = "|"
+		bfmt    = "|"
 		isGroup bool
 	)
 	for i, v := range head {
@@ -67,31 +81,35 @@ func tablef(title string, head [][2]interface{}, body map[string][][]interface{}
 			isGroup = true
 		}
 		if i > 0 || name != "-" {
-			format += fmt.Sprintf(" %%-%dv |", width)
+			hfmt += fmt.Sprintf("\033[1;32m %%-%dv \033[1;30m|", width)
+			bfmt += fmt.Sprintf("\033[1;37m %%-%dv \033[1;30m|", width)
 			names = append(names, name)
 			widths = append(widths, width)
 		}
 	}
-	line := "+"
+	line := "\033[1;30m+"
 	for _, v := range widths {
 		line += strings.Repeat("-", v+2) + "+"
 	}
 	var total int
 	builder.WriteString(line + "\n")
-	builder.WriteString(fmt.Sprintf(format, names...) + "\n")
+	builder.WriteString(fmt.Sprintf(hfmt, names...) + "\n")
 	if len(body) > 0 {
 		for k, group := range body {
 			builder.WriteString(line + "\n")
 			for i, v := range group {
+				if len(v) < len(head)-1 {
+					continue
+				}
 				if total++; k == "" && !isGroup {
-					builder.WriteString(fmt.Sprintf(format, v...) + "\n")
+					builder.WriteString(fmt.Sprintf(bfmt, v[:len(head)-1]...) + "\n")
 					continue
 				}
 				if i > 0 {
 					k = ""
 				}
-				params := append([]interface{}{k}, v...)
-				builder.WriteString(fmt.Sprintf(format, params...) + "\n")
+				params := append([]interface{}{k}, v[:len(head)-1]...)
+				builder.WriteString(fmt.Sprintf(bfmt, params...) + "\n")
 			}
 		}
 	} else {
@@ -99,7 +117,8 @@ func tablef(title string, head [][2]interface{}, body map[string][][]interface{}
 	}
 	if count {
 		builder.WriteString(line + "\n")
-		builder.WriteString(fmt.Sprintf(fmt.Sprintf("| %%-%ds |\n", len(line)-4), fmt.Sprintf("Total: %d", total)))
+		builder.WriteString(fmt.Sprintf(fmt.Sprintf("|\033[1;35m %%-%ds \033[1;30m|\n", len(line)-11),
+			fmt.Sprintf("Total: %d", total)))
 	}
 	builder.WriteString(line)
 	infof(title, builder.String())
@@ -108,15 +127,18 @@ func tablef(title string, head [][2]interface{}, body map[string][][]interface{}
 func htablef(title string, body []map[string]interface{}, widths [3]int, count bool) {
 	var (
 		builder strings.Builder
-		format  = fmt.Sprintf("| %%-%dv | %%-%dv | %%-%dv |", widths[0], widths[1], widths[2])
-		line    = "+"
+		hfmt    = fmt.Sprintf("|\033[1;32m %%-%dv \033[1;30m|\033[1;32m %%-%dv \033[1;30m|\033[1;32m %%-%dv \033[1;30m|",
+			widths[0], widths[1], widths[2])
+		bfmt = fmt.Sprintf("|\033[1;37m %%-%dv \033[1;30m|\033[1;37m %%-%dv \033[1;30m|\033[1;37m %%-%dv \033[1;30m|",
+			widths[0], widths[1], widths[2])
+		line = "\033[1;30m+"
 	)
 	for _, v := range widths {
 		line += strings.Repeat("-", v+2) + "+"
 	}
 	var total int
 	builder.WriteString(line + "\n")
-	builder.WriteString(fmt.Sprintf(format, "Name", "Key", "Value") + "\n")
+	builder.WriteString(fmt.Sprintf(hfmt, "Name", "Key", "Value") + "\n")
 	if len(body) > 0 {
 		for _, item := range body {
 			total++
@@ -126,7 +148,7 @@ func htablef(title string, body []map[string]interface{}, widths [3]int, count b
 				if i > 0 {
 					name = ""
 				}
-				builder.WriteString(fmt.Sprintf(format, name, v["key"], v["value"]) + "\n")
+				builder.WriteString(fmt.Sprintf(bfmt, name, v["key"], v["value"]) + "\n")
 			}
 		}
 	} else {
@@ -134,9 +156,105 @@ func htablef(title string, body []map[string]interface{}, widths [3]int, count b
 	}
 	if count {
 		builder.WriteString(line + "\n")
-		builder.WriteString(fmt.Sprintf(fmt.Sprintf("| %%-%ds |\n", len(line)-4), fmt.Sprintf("Total: %d", total)))
+		builder.WriteString(fmt.Sprintf(fmt.Sprintf("|\033[1;35m %%-%ds \033[1;30m|\n", len(line)-11),
+			fmt.Sprintf("Total: %d", total)))
 	}
 	builder.WriteString(line)
+	infof(title, builder.String())
+}
+
+func atanChar(data [][]interface{}, at float64, colors []string) string {
+	if len(data) == 0 {
+		return "  "
+	}
+	n := at - data[0][2].(float64)
+	if n <= 0 {
+		return colors[0] + "* \033[0m"
+	}
+	return atanChar(data[1:], n, colors[1:])
+}
+
+func pief(title string, body map[string][][]interface{}) {
+	var builder strings.Builder
+	if len(body) > 0 {
+		first := true
+		for k, v := range body {
+			if !first {
+				builder.WriteString("\n\n\n")
+			} else {
+				first = false
+			}
+			if len(v) > 10 {
+				v = v[:10]
+			}
+			for i, y := 0, -7; y < 7; y++ {
+				var c string
+				for x := -7; x < 7; x++ {
+					if x*x+y*y < 49 {
+						c += atanChar(v, math.Atan2(float64(y), float64(x))/math.Pi/2+0.5, pieColors)
+					} else {
+						c += "  "
+					}
+				}
+				if i > 0 {
+					if i == 1 {
+						builder.WriteString(fmt.Sprintf("%s   \033[1;32m%s\n", c, strings.ToUpper(k)))
+					} else if n := i - 3; n >= 0 && n < len(v) {
+						builder.WriteString(fmt.Sprintf("%s   %s%5.2f%%%% - %s\033[0m\n",
+							c, pieColors[n], v[n][2].(float64)*100, v[n][0]))
+					} else if builder.WriteString(c); i < 13 {
+						builder.WriteString("\n")
+					}
+				}
+				i++
+			}
+		}
+	}
+	infof(title, builder.String())
+}
+
+func histf(title string, body map[string][][]interface{}) {
+	var builder strings.Builder
+	if len(body) > 0 {
+		first := true
+		for k, v := range body {
+			if !first {
+				builder.WriteString("\n\n\n")
+			} else {
+				first = false
+			}
+			builder.WriteString(fmt.Sprintf("\033[1;32m%s\n\n", strings.ToUpper(k)))
+			var (
+				maxNameLen  int
+				maxCountLen int
+				maxCount    uint64
+			)
+			for _, o := range v {
+				if n := len(o[0].(string)); n > maxNameLen {
+					maxNameLen = n
+				}
+				if n := len(fmt.Sprintf("%d", o[1])); n > maxCountLen {
+					maxCountLen = n
+				}
+				if n := o[1].(uint64); n > maxCount {
+					maxCount = n
+				}
+			}
+			format := fmt.Sprintf("\033[1;37m%%%ds  [%%%dd]  %%s", maxNameLen, maxCountLen)
+			for i, o := range v {
+				var (
+					n   = int(math.Round(float64(o[1].(uint64)) / float64(maxCount) * 36 * 8))
+					bar = strings.Repeat(histChars[7], n/8)
+				)
+				if n%8 > 0 {
+					bar += histChars[n%8]
+				}
+				if builder.WriteString(fmt.Sprintf(format, o[0], o[1], bar)); i < len(v)-1 {
+					builder.WriteString("\n")
+				}
+			}
+		}
+	}
 	infof(title, builder.String())
 }
 
@@ -161,7 +279,7 @@ func omitStr(s string, maxWidth int) string {
 	return s[:maxWidth-3] + "..."
 }
 
-func printFacet(result *zoomeye.SearchResult, facets []string) {
+func printFacet(result *zoomeye.SearchResult, facets []string, figure string) {
 	var (
 		head = [][2]interface{}{
 			[2]interface{}{"Type", 10},
@@ -175,7 +293,7 @@ func printFacet(result *zoomeye.SearchResult, facets []string) {
 			s = "product"
 		}
 		if facet, ok := result.Facets[s]; ok {
-			group := make([][]interface{}, 0)
+			group := make([][]interface{}, 0, len(facet))
 			for _, v := range facet {
 				var name string
 				switch n := v.Name.(type) {
@@ -188,15 +306,23 @@ func printFacet(result *zoomeye.SearchResult, facets []string) {
 				if name == "" {
 					name = "[unknown]"
 				}
-				group = append(group, []interface{}{omitStr(name, 35), v.Count})
+				group = append(group, []interface{}{omitStr(name, 35), v.Count,
+					float64(v.Count) / float64(result.Total)})
 			}
 			body[s] = group
 		}
 	}
-	tablef("Facets Info", head, body, false)
+	switch figure {
+	case "":
+		tablef("Facets Info", head, body, false)
+	case "pie":
+		pief("Facets Pie", body)
+	case "hist":
+		histf("Facets Histogram", body)
+	}
 }
 
-func printStat(result *zoomeye.SearchResult, keys []string) {
+func printStat(result *zoomeye.SearchResult, keys []string, figure string) {
 	var (
 		head = [][2]interface{}{
 			[2]interface{}{"Type", 10},
@@ -206,13 +332,23 @@ func printStat(result *zoomeye.SearchResult, keys []string) {
 		body = make(map[string][][]interface{})
 	)
 	for s, stat := range result.Statistics(keys...) {
-		group := make([][]interface{}, 0)
+		group := make([][]interface{}, 0, len(stat))
 		for k, v := range stat {
-			group = append(group, []interface{}{omitStr(k, 35), v})
+			group = append(group, []interface{}{omitStr(k, 35), v, float64(v) / float64(len(result.Matches))})
 		}
+		sort.Slice(group, func(i, j int) bool {
+			return group[j][1].(uint64) < group[i][1].(uint64)
+		})
 		body[s] = group
 	}
-	tablef("Statistics Info", head, body, false)
+	switch figure {
+	case "":
+		tablef("Statistics Info", head, body, false)
+	case "pie":
+		pief("Statistics Pie", body)
+	case "hist":
+		histf("Statistics Histogram", body)
+	}
 }
 
 func dataToString(o interface{}) string {

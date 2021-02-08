@@ -94,6 +94,7 @@ succeed to query
 -count               查询该 dork 在 ZoomEye 数据库中的总量
 -facet [field,...]   查询该 dork 在 ZoomEye 数据库中全量数据的分布情况，以逗号分隔（如：-facet "app,service,os"）
 -stat [field,...]    统计本次搜索结果数据中指定字段的分布情况，以逗号分隔（如：-stat "app,service,os"）
+-figure [pie/hist]   输出统计数据的饼状图/柱状图（仅在指定了 -facet 或 -stat 参数下有效）
 -filter [field,...]  对本次搜索结果数据中指定字段进行筛选，以逗号分隔（如：-filter "app,ip,title"）
 -save                保存本次搜索结果数据，若使用 filter 参数指定了筛选条件，筛选结果也会保存
 ```
@@ -104,19 +105,22 @@ succeed to query
     - 当 `-type` 为 `host` 时，可以使用 `app,device,service,os,port,country,city`
     - 当 `-type` 为 `web` 时，可以使用 `webapp,component,framework,frontend,server,waf,os,country,city`
 - `-filter`
-    - 当 `-type` 为 `host` 时，可以使用 `app,version,device,ip,port,hostname,city,city_cn,country,country_cn,asn,banner`
-    - 当 `-type` 为 `web` 时，可以使用 `app,headers,keywords,title,ip,site,city,city_cn,country,country_cn`
+    - 当 `-type` 为 `host` 时，可以使用 `app,version,device,ip,port,hostname,city,country,asn,banner`
+    - 当 `-type` 为 `web` 时，可以使用 `app,headers,keywords,title,ip,site,city,country`
 
 使用示例：
 
 ```bash
-./ZoomEye-go search -dork "telnet" -num 1 -count
+./ZoomEye-go search -dork "telnet" -count
 succeed to search (in 272.080753ms)
 
 [Total Count]
 
   Count: 57003299
 
+
+./ZoomEye-go search -dork "telnet" -num 1
+succeed to search (in 370.930383ms)
 
 [Host Search Result]
 
@@ -127,6 +131,25 @@ succeed to search (in 272.080753ms)
   +-----------------------+----------------------+----------------------+------------------------------------------+----------------------+
   | Total: 1                                                                                                                              |
   +-----------------------+----------------------+----------------------+------------------------------------------+----------------------+
+
+
+./ZoomEye-go search -dork "weblogic" -facet "country" -figure "hist"
+succeed to search (in 177.088662ms)
+
+[Facets Histogram]
+
+  COUNTRY
+  
+  United States  [232751]  ▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉
+          Japan  [ 45285]  ▉▉▉▉▉▉▉
+          China  [ 37926]  ▉▉▉▉▉▉
+        Bahrain  [ 28816]  ▉▉▉▉▌
+        Germany  [ 28001]  ▉▉▉▉▍
+   South Africa  [ 27929]  ▉▉▉▉▍
+         Sweden  [ 25679]  ▉▉▉▉
+         Brazil  [ 25655]  ▉▉▉▉
+          India  [ 25036]  ▉▉▉▉
+        Ireland  [ 24407]  ▉▉▉▊
 
 ```
 
@@ -140,7 +163,7 @@ succeed to search (in 272.080753ms)
 
 #### 加载分析本地数据
 
-`ZoomEye-go` 也可以通过 `load` 命令加载本地数据，并将它解析成搜索结果数据类型，支持与 `search` 命令类似的 `-count` 、 `-facet` 、 `-stat` 和 `-filter` 参数对数据进行统计分析，不同的是，`-save` 参数仅会保存 `-filter` 的执行结果。
+`ZoomEye-go` 也可以通过 `load` 命令加载本地数据，并将它解析成搜索结果数据类型，支持与 `search` 命令类似的 `-count` 、 `-facet` 、 `-stat` 、 `-figure` 和 `-filter` 参数对数据进行统计分析，不同的是，`-save` 参数仅会保存 `-filter` 的执行结果。
 
 可以通过 `load -h` 获取帮助。
 

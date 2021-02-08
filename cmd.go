@@ -68,6 +68,7 @@ func cmdSearch(agent *ZoomEyeAgent) {
 		count    bool
 		facet    string
 		stat     string
+		figure   string
 		filter   string
 		save     bool
 	}
@@ -78,6 +79,7 @@ func cmdSearch(agent *ZoomEyeAgent) {
 	flag.BoolVar(&args.count, "count", false, "The total number of results in ZoomEye database for a search")
 	flag.StringVar(&args.facet, "facet", "", "Perform statistics on ZoomEye database")
 	flag.StringVar(&args.stat, "stat", "", "Perform statistics on search results")
+	flag.StringVar(&args.figure, "figure", "", "Output Pie or bar chart only be used under facet and stat")
 	flag.StringVar(&args.filter, "filter", "", "Output more clearer search results by set filter field")
 	flag.BoolVar(&args.save, "save", false, "Save the search results in JSON format")
 	if flag.Parse(); args.dork == "" {
@@ -104,11 +106,16 @@ func cmdSearch(agent *ZoomEyeAgent) {
 	if args.count {
 		infof("Total Count", "Count: %d", result.Total)
 	}
+	if args.figure != "" {
+		if args.figure = strings.ToLower(args.figure); args.figure != "pie" {
+			args.figure = "hist"
+		}
+	}
 	if args.facet != "" {
-		printFacet(result, strings.Split(args.facet, ","))
+		printFacet(result, strings.Split(args.facet, ","), args.figure)
 	}
 	if args.stat != "" {
-		printStat(result, strings.Split(args.stat, ","))
+		printStat(result, strings.Split(args.stat, ","), args.figure)
 	}
 	if args.filter != "" {
 		printFilter(result, strings.Split(args.filter, ","))
@@ -132,6 +139,7 @@ func cmdLoad(agent *ZoomEyeAgent) {
 		count  bool
 		facet  string
 		stat   string
+		figure string
 		filter string
 		save   bool
 	}
@@ -139,6 +147,7 @@ func cmdLoad(agent *ZoomEyeAgent) {
 	flag.BoolVar(&args.count, "count", false, "The total number of results in ZoomEye database in local data")
 	flag.StringVar(&args.facet, "facet", "", "Perform statistics on ZoomEye database in local data")
 	flag.StringVar(&args.stat, "stat", "", "Perform statistics in local data")
+	flag.StringVar(&args.figure, "figure", "", "Output Pie or bar chart only be used under facet and stat")
 	flag.StringVar(&args.filter, "filter", "", "Output more clearer results by set filter field in local data")
 	flag.BoolVar(&args.save, "save", false, "Save the filter data in JSON format")
 	if flag.Parse(); args.file == "" {
@@ -154,11 +163,16 @@ func cmdLoad(agent *ZoomEyeAgent) {
 	if args.count {
 		infof("Total Count", "Count: %d", result.Total)
 	}
+	if args.figure != "" {
+		if args.figure = strings.ToLower(args.figure); args.figure != "pie" {
+			args.figure = "hist"
+		}
+	}
 	if args.facet != "" {
-		printFacet(result, strings.Split(args.facet, ","))
+		printFacet(result, strings.Split(args.facet, ","), args.figure)
 	}
 	if args.stat != "" {
-		printStat(result, strings.Split(args.stat, ","))
+		printStat(result, strings.Split(args.stat, ","), args.figure)
 	}
 	if args.filter != "" {
 		printFilter(result, strings.Split(args.filter, ","))
