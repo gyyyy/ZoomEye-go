@@ -57,18 +57,21 @@ func (z *ZoomEye) request(method, u string, body io.Reader, result Result) error
 	if resp.Body.Close(); err != nil {
 		return err
 	}
-	if resp.StatusCode != 200 {
-		e := &ErrorResult{}
-		if err = json.Unmarshal(b, &e); err != nil {
+	if resp.StatusCode == 200 {
+		if err = json.Unmarshal(b, result); err != nil {
 			return err
 		}
-		return e
+		result.setRawData(b)
+		return nil
 	}
-	if err = json.Unmarshal(b, result); err != nil {
+	if resp.StatusCode == 403 && bytes.Contains(b, []byte("specified resource")) {
+		return nil
+	}
+	e := &ErrorResult{}
+	if err = json.Unmarshal(b, &e); err != nil {
 		return err
 	}
-	result.setRawData(b)
-	return nil
+	return e
 }
 
 func (z *ZoomEye) get(u string, params map[string]interface{}, result Result) error {

@@ -86,7 +86,7 @@ func TestFilter(t *testing.T) {
 	if result, err = defaultZoom.DorkSearch("dedecms", 0, "web", ""); err != nil {
 		t.FailNow()
 	}
-	t.Log(result.Filter("site", "ip", "country_cn"))
+	t.Log(result.Filter("site", "ip", "country"))
 }
 
 func TestHistoryIP(t *testing.T) {
