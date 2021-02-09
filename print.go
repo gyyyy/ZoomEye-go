@@ -8,6 +8,34 @@ import (
 	"strings"
 )
 
+const (
+	colorReset       = "\033[0m"
+	colorBlack       = "\033[0;30m"
+	colorRed         = "\033[0;31m"
+	colorGreen       = "\033[0;32m"
+	colorYellow      = "\033[0;33m"
+	colorBlue        = "\033[0;34m"
+	colorPurple      = "\033[0;35m"
+	colorCyan        = "\033[0;36m"
+	colorWhite       = "\033[0;37m"
+	colorLightBlack  = "\033[1;30m"
+	colorLightRed    = "\033[1;31m"
+	colorLightGreen  = "\033[1;32m"
+	colorLightYellow = "\033[1;33m"
+	colorLightBlue   = "\033[1;34m"
+	colorLightPurple = "\033[1;35m"
+	colorLightCyan   = "\033[1;36m"
+	colorLightWhite  = "\033[1;37m"
+	colorDarkBlack   = "\033[2;30m"
+	colorDarkRed     = "\033[2;31m"
+	colorDarkGreen   = "\033[2;32m"
+	colorDarkYellow  = "\033[2;33m"
+	colorDarkBlue    = "\033[2;34m"
+	colorDarkPurple  = "\033[2;35m"
+	colorDarkCyan    = "\033[2;36m"
+	colorDarkWhite   = "\033[2;37m"
+)
+
 var (
 	spaces = map[rune]string{
 		'\t': "\\t",
@@ -15,16 +43,6 @@ var (
 		'\v': "\\v",
 		'\f': "\\f",
 		'\r': "\\r",
-	}
-	colors = map[string]string{
-		"black":  "\033[0;30m",
-		"red":    "\033[0;31m",
-		"green":  "\033[0;32m",
-		"yellow": "\033[0;33m",
-		"blue":   "\033[0;34m",
-		"purple": "\033[0;35m",
-		"cyan":   "\033[0;36m",
-		"white":  "\033[0;37m",
 	}
 	pieColors = []string{
 		"\033[1;34m", "\033[1;35m", "\033[1;36m", "\033[1;31m", "\033[1;33m",
@@ -35,12 +53,15 @@ var (
 	}
 )
 
-func print(s, color string) {
-	c, ok := colors[color]
-	if !ok {
-		c = colors["white"]
+func colorf(s, color string) string {
+	if color == "" {
+		return s
 	}
-	fmt.Printf("%s%s\033[0m\n", c, s)
+	return color + s + colorReset
+}
+
+func print(s, color string) {
+	fmt.Println(colorf(s, color))
 }
 
 func errorf(format string, a ...interface{}) {
@@ -57,7 +78,8 @@ func warnf(format string, a ...interface{}) {
 
 func infof(title, format string, a ...interface{}) {
 	if title != "" {
-		format = "\n\033[1;36m[" + title + "]\n\n  \033[1;37m" + strings.ReplaceAll(format, "\n", "\n  ") + "\n"
+		format = "\n" + colorf("["+title+"]", colorLightCyan) + "\n\n" +
+			colorf("  "+strings.ReplaceAll(format, "\n", "\n  "), colorLightWhite) + "\n"
 	}
 	print(fmt.Sprintf(format, a...), "")
 }
@@ -68,8 +90,8 @@ func tablef(title string, head [][2]interface{}, body map[string][][]interface{}
 		n       = len(head)
 		names   = make([]interface{}, 0, n)
 		widths  = make([]int, 0, n)
-		hfmt    = "|"
-		bfmt    = "|"
+		hfmt    = colorf("|", colorLightBlack)
+		bfmt    = colorf("|", colorLightBlack)
 		isGroup bool
 	)
 	for i, v := range head {
@@ -81,16 +103,17 @@ func tablef(title string, head [][2]interface{}, body map[string][][]interface{}
 			isGroup = true
 		}
 		if i > 0 || name != "-" {
-			hfmt += fmt.Sprintf("\033[1;32m %%-%dv \033[1;30m|", width)
-			bfmt += fmt.Sprintf("\033[1;37m %%-%dv \033[1;30m|", width)
+			hfmt += fmt.Sprintf(colorf(" %%-%dv ", colorLightGreen)+colorf("|", colorLightBlack), width)
+			bfmt += fmt.Sprintf(colorf(" %%-%dv ", colorLightWhite)+colorf("|", colorLightBlack), width)
 			names = append(names, name)
 			widths = append(widths, width)
 		}
 	}
-	line := "\033[1;30m+"
+	line := "+"
 	for _, v := range widths {
 		line += strings.Repeat("-", v+2) + "+"
 	}
+	line = colorf(line, colorLightBlack)
 	var total int
 	builder.WriteString(line + "\n")
 	builder.WriteString(fmt.Sprintf(hfmt, names...) + "\n")
@@ -117,8 +140,13 @@ func tablef(title string, head [][2]interface{}, body map[string][][]interface{}
 	}
 	if count {
 		builder.WriteString(line + "\n")
-		builder.WriteString(fmt.Sprintf(fmt.Sprintf("|\033[1;35m %%-%ds \033[1;30m|\n", len(line)-11),
-			fmt.Sprintf("Total: %d", total)))
+		builder.WriteString(fmt.Sprintf(
+			fmt.Sprintf(
+				colorf("|", colorLightBlack)+colorf(" %%-%ds ", colorLightPurple)+colorf("|", colorLightBlack)+"\n",
+				len(line)-15,
+			),
+			fmt.Sprintf("Total: %d", total),
+		))
 	}
 	builder.WriteString(line)
 	infof(title, builder.String())
@@ -127,15 +155,22 @@ func tablef(title string, head [][2]interface{}, body map[string][][]interface{}
 func htablef(title string, body []map[string]interface{}, widths [3]int, count bool) {
 	var (
 		builder strings.Builder
-		hfmt    = fmt.Sprintf("|\033[1;32m %%-%dv \033[1;30m|\033[1;32m %%-%dv \033[1;30m|\033[1;32m %%-%dv \033[1;30m|",
+		hfmt    = fmt.Sprintf(colorf("|", colorLightBlack)+
+			colorf(" %%-%dv ", colorLightGreen)+colorf("|", colorLightBlack)+
+			colorf(" %%-%dv ", colorLightGreen)+colorf("|", colorLightBlack)+
+			colorf(" %%-%dv ", colorLightGreen)+colorf("|", colorLightBlack),
 			widths[0], widths[1], widths[2])
-		bfmt = fmt.Sprintf("|\033[1;37m %%-%dv \033[1;30m|\033[1;37m %%-%dv \033[1;30m|\033[1;37m %%-%dv \033[1;30m|",
+		bfmt = fmt.Sprintf(colorf("|", colorLightBlack)+
+			colorf(" %%-%dv ", colorLightWhite)+colorf("|", colorLightBlack)+
+			colorf(" %%-%dv ", colorLightWhite)+colorf("|", colorLightBlack)+
+			colorf(" %%-%dv ", colorLightWhite)+colorf("|", colorLightBlack),
 			widths[0], widths[1], widths[2])
-		line = "\033[1;30m+"
+		line = "+"
 	)
 	for _, v := range widths {
 		line += strings.Repeat("-", v+2) + "+"
 	}
+	line = colorf(line, colorLightBlack)
 	var total int
 	builder.WriteString(line + "\n")
 	builder.WriteString(fmt.Sprintf(hfmt, "Name", "Key", "Value") + "\n")
@@ -156,8 +191,13 @@ func htablef(title string, body []map[string]interface{}, widths [3]int, count b
 	}
 	if count {
 		builder.WriteString(line + "\n")
-		builder.WriteString(fmt.Sprintf(fmt.Sprintf("|\033[1;35m %%-%ds \033[1;30m|\n", len(line)-11),
-			fmt.Sprintf("Total: %d", total)))
+		builder.WriteString(fmt.Sprintf(
+			fmt.Sprintf(
+				colorf("|", colorLightBlack)+colorf(" %%-%ds ", colorLightPurple)+colorf("|", colorLightBlack)+"\n",
+				len(line)-15,
+			),
+			fmt.Sprintf("Total: %d", total),
+		))
 	}
 	builder.WriteString(line)
 	infof(title, builder.String())
@@ -169,7 +209,7 @@ func atanChar(data [][]interface{}, at float64, colors []string) string {
 	}
 	n := at - data[0][2].(float64)
 	if n <= 0 {
-		return colors[0] + "* \033[0m"
+		return colors[0] + "* " + colorReset
 	}
 	return atanChar(data[1:], n, colors[1:])
 }
@@ -198,10 +238,10 @@ func pief(title string, body map[string][][]interface{}) {
 				}
 				if i > 0 {
 					if i == 1 {
-						builder.WriteString(fmt.Sprintf("%s   \033[1;32m%s\n", c, strings.ToUpper(k)))
+						builder.WriteString(c + "   " + colorf(strings.ToUpper(k), colorLightGreen) + "\n")
 					} else if n := i - 3; n >= 0 && n < len(v) {
-						builder.WriteString(fmt.Sprintf("%s   %s%5.2f%%%% - %s\033[0m\n",
-							c, pieColors[n], v[n][2].(float64)*100, v[n][0]))
+						builder.WriteString(c + "   " +
+							colorf(fmt.Sprintf("%5.2f%%%% - %s", v[n][2].(float64)*100, v[n][0]), pieColors[n]) + "\n")
 					} else if builder.WriteString(c); i < 13 {
 						builder.WriteString("\n")
 					}
@@ -223,7 +263,7 @@ func histf(title string, body map[string][][]interface{}) {
 			} else {
 				first = false
 			}
-			builder.WriteString(fmt.Sprintf("\033[1;32m%s\n\n", strings.ToUpper(k)))
+			builder.WriteString(colorf(strings.ToUpper(k), colorLightGreen) + "\n\n")
 			var (
 				maxNameLen  int
 				maxCountLen int
@@ -240,7 +280,7 @@ func histf(title string, body map[string][][]interface{}) {
 					maxCount = n
 				}
 			}
-			format := fmt.Sprintf("\033[1;37m%%%ds  [%%%dd]  %%s", maxNameLen, maxCountLen)
+			format := fmt.Sprintf("%%%ds  [%%%dd]  %%s", maxNameLen, maxCountLen)
 			for i, o := range v {
 				var (
 					n   = int(math.Round(float64(o[1].(uint64)) / float64(maxCount) * 36 * 8))
@@ -249,7 +289,7 @@ func histf(title string, body map[string][][]interface{}) {
 				if n%8 > 0 {
 					bar += histChars[n%8]
 				}
-				if builder.WriteString(fmt.Sprintf(format, o[0], o[1], bar)); i < len(v)-1 {
+				if builder.WriteString(colorf(fmt.Sprintf(format, o[0], o[1], bar), colorLightWhite)); i < len(v)-1 {
 					builder.WriteString("\n")
 				}
 			}
@@ -273,10 +313,10 @@ func convertStr(s string) string {
 }
 
 func omitStr(s string, maxWidth int) string {
-	if len(s) <= maxWidth {
-		return s
+	if len(s) > maxWidth {
+		s = s[:maxWidth-3] + "..."
 	}
-	return s[:maxWidth-3] + "..."
+	return strings.ReplaceAll(s, "%", "%%")
 }
 
 func printFacet(result *zoomeye.SearchResult, facets []string, figure string) {
