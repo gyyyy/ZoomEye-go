@@ -289,7 +289,8 @@ func histf(title string, body map[string][][]interface{}) {
 				if n%8 > 0 {
 					bar += histChars[n%8]
 				}
-				if builder.WriteString(colorf(fmt.Sprintf(format, o[0], o[1], bar), colorLightWhite)); i < len(v)-1 {
+				builder.WriteString(colorf(fmt.Sprintf(format, o[0], o[1], bar), colorLightWhite))
+				if i < len(v)-1 {
 					builder.WriteString("\n")
 				}
 			}

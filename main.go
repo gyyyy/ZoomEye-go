@@ -50,8 +50,7 @@ func main() {
 	case "load":
 		cmdLoad(agent)
 	case "clean":
-		agent.Clean()
-		successf("succeed to clean all cache data")
+		cmdClean(agent)
 	case "help", "-help", "--help", "-h", "?":
 		help()
 	default:

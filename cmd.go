@@ -193,3 +193,8 @@ func cmdLoad(agent *ZoomEyeAgent) {
 		}
 	}
 }
+
+func cmdClean(agent *ZoomEyeAgent) {
+	agent.Clean()
+	successf("succeed to clean all cache data")
+}
