@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -19,6 +20,13 @@ func cmdInit(agent *ZoomEyeAgent) {
 	flag.StringVar(&args.apiKey, "apikey", "", "ZoomEye API-Key")
 	flag.StringVar(&args.username, "username", "", "ZoomEye account username")
 	flag.StringVar(&args.password, "password", "", "ZoomEye account password")
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "\nUsage of %s (init):\n", filepath.Base(os.Args[0]))
+		flag.PrintDefaults()
+		fmt.Fprintf(flag.CommandLine.Output(),
+			"Example:\n  ./ZoomEye-go init -apikey \"XXXXXXXX-XXXX-XXXXX-XXXX-XXXXXXXXXXX\"\n"+
+				"  ./ZoomEye-go init -username \"username@zoomeye.org\" -password \"password\"\n\n")
+	}
 	flag.Parse()
 	var (
 		result *zoomeye.ResourcesInfoResult
@@ -39,7 +47,7 @@ func cmdInit(agent *ZoomEyeAgent) {
 		return
 	}
 	successf("succeed to initialize")
-	infof("Resources Info", "Role:  %s\nQuota: %d", result.Plan, result.Resources.Search)
+	infof("ZoomEye Resources Info", "Role:  %s\nQuota: %d", result.Plan, result.Resources.Search)
 }
 
 func cmdInfo(agent *ZoomEyeAgent) {
@@ -56,12 +64,25 @@ func cmdInfo(agent *ZoomEyeAgent) {
 		return
 	}
 	successf("succeed to query")
-	infof("Resources Info", "Role:  %s\nQuota: %d", result.Plan, result.Resources.Search)
+	infof("ZoomEye Resources Info", "Role:  %s\nQuota: %d", result.Plan, result.Resources.Search)
+}
+
+func commandVal() string {
+	var v string
+	if len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], "-") {
+		v = os.Args[1]
+		os.Args = append(os.Args[0:1], os.Args[2:]...)
+	}
+	return v
 }
 
 func cmdSearch(agent *ZoomEyeAgent) {
+	dork := commandVal()
+	if dork == "" {
+		warnf("search keyword missing, please run <zoomeye search -h> for help")
+		return
+	}
 	var args struct {
-		dork     string
 		num      int
 		resource string
 		force    bool
@@ -72,7 +93,6 @@ func cmdSearch(agent *ZoomEyeAgent) {
 		filter   string
 		save     bool
 	}
-	flag.StringVar(&args.dork, "dork", "", "[REQUIRED] The ZoomEye search keyword or ZoomEye exported file")
 	flag.IntVar(&args.num, "num", 20, "The number of search results that should be returned, multiple of 20")
 	flag.StringVar(&args.resource, "type", "host", "Specify the type of resource to search")
 	flag.BoolVar(&args.force, "force", false, "Ignore local and cache data")
@@ -82,13 +102,16 @@ func cmdSearch(agent *ZoomEyeAgent) {
 	flag.StringVar(&args.figure, "figure", "", "Output Pie or bar chart only be used under facet and stat")
 	flag.StringVar(&args.filter, "filter", "", "Output more clearer search results by set filter field")
 	flag.BoolVar(&args.save, "save", false, "Save the search results in JSON format")
-	if flag.Parse(); args.dork == "" {
-		warnf("required parameter missing, please run <zoomeye search -h> for help")
-		return
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "\nUsage of %s (search):\n", filepath.Base(os.Args[0]))
+		flag.PrintDefaults()
+		fmt.Fprintf(flag.CommandLine.Output(),
+			"Example:\n  ./Zoomeye-go search \"weblogic\" -facet \"app\" -count\n\n")
 	}
+	flag.Parse()
 	var (
 		start       = time.Now()
-		result, err = agent.Search(args.dork, args.num, args.resource, args.force)
+		result, err = agent.Search(dork, args.num, args.resource, args.force)
 		since       = time.Since(start)
 	)
 	if err != nil {
@@ -104,7 +127,7 @@ func cmdSearch(agent *ZoomEyeAgent) {
 	}
 	successf("succeed to search (in %v)", since)
 	if args.count {
-		infof("Total Count", "Count: %d", result.Total)
+		infof("ZoomEye Total", "Count: %d", result.Total)
 	}
 	if args.figure != "" {
 		if args.figure = strings.ToLower(args.figure); args.figure != "pie" {
@@ -124,7 +147,7 @@ func cmdSearch(agent *ZoomEyeAgent) {
 		printData(result)
 	}
 	if args.save {
-		name := fmt.Sprintf("%s_%s_%d", args.resource, url.QueryEscape(args.dork), args.num)
+		name := fmt.Sprintf("%s_%s_%d", args.resource, url.QueryEscape(dork), args.num)
 		if path, err := agent.Save(result, name); err != nil {
 			errorf("failed to save: %v", err)
 		} else {
@@ -134,8 +157,12 @@ func cmdSearch(agent *ZoomEyeAgent) {
 }
 
 func cmdLoad(agent *ZoomEyeAgent) {
+	file := commandVal()
+	if file == "" {
+		warnf("path of local data file missing, please run <zoomeye load -h> for help")
+		return
+	}
 	var args struct {
-		file   string
 		count  bool
 		facet  string
 		stat   string
@@ -143,25 +170,27 @@ func cmdLoad(agent *ZoomEyeAgent) {
 		filter string
 		save   bool
 	}
-	flag.StringVar(&args.file, "file", "", "[REQUIRED] The path of local data")
 	flag.BoolVar(&args.count, "count", false, "The total number of results in ZoomEye database in local data")
 	flag.StringVar(&args.facet, "facet", "", "Perform statistics on ZoomEye database in local data")
 	flag.StringVar(&args.stat, "stat", "", "Perform statistics in local data")
 	flag.StringVar(&args.figure, "figure", "", "Output Pie or bar chart only be used under facet and stat")
 	flag.StringVar(&args.filter, "filter", "", "Output more clearer results by set filter field in local data")
 	flag.BoolVar(&args.save, "save", false, "Save the filter data in JSON format")
-	if flag.Parse(); args.file == "" {
-		warnf("required parameter missing, please run <zoomeye load -h> for help")
-		return
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "\nUsage of %s (load):\n", filepath.Base(os.Args[0]))
+		flag.PrintDefaults()
+		fmt.Fprintf(flag.CommandLine.Output(),
+			"Example:\n  ./Zoomeye-go load \"data/host_weblogic_20.json\" -facet \"app\" -count\n\n")
 	}
-	result, err := agent.Load(args.file)
+	flag.Parse()
+	result, err := agent.Load(file)
 	if err != nil {
 		errorf("invalid local data: %v", err)
 		return
 	}
 	successf("succeed to load")
 	if args.count {
-		infof("Total Count", "Count: %d", result.Total)
+		infof("ZoomEye Total", "Count: %d", result.Total)
 	}
 	if args.figure != "" {
 		if args.figure = strings.ToLower(args.figure); args.figure != "pie" {
@@ -182,8 +211,8 @@ func cmdLoad(agent *ZoomEyeAgent) {
 	}
 	if args.save {
 		var (
-			ext  = filepath.Ext(args.file)
-			path = strings.TrimSuffix(args.file, ext) + "_filtered" + ext
+			ext  = filepath.Ext(file)
+			path = strings.TrimSuffix(file, ext) + "_filtered" + ext
 		)
 		if err := agent.SaveFilterData(result.FilterCache, path); err != nil {
 			errorf("failed to save: %v", err)

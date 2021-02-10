@@ -65,15 +65,15 @@ func print(s, color string) {
 }
 
 func errorf(format string, a ...interface{}) {
-	print(fmt.Sprintf(format, a...), "red")
+	print(fmt.Sprintf(format, a...), colorRed)
 }
 
 func successf(format string, a ...interface{}) {
-	print(fmt.Sprintf(format, a...), "green")
+	print(fmt.Sprintf(format, a...), colorGreen)
 }
 
 func warnf(format string, a ...interface{}) {
-	print(fmt.Sprintf(format, a...), "yellow")
+	print(fmt.Sprintf(format, a...), colorYellow)
 }
 
 func infof(title, format string, a ...interface{}) {
@@ -238,7 +238,7 @@ func pief(title string, body map[string][][]interface{}) {
 				}
 				if i > 0 {
 					if i == 1 {
-						builder.WriteString(c + "   " + colorf(strings.ToUpper(k), colorLightGreen) + "\n")
+						builder.WriteString(c + "   " + colorf("Type: "+k, colorLightGreen) + "\n")
 					} else if n := i - 3; n >= 0 && n < len(v) {
 						builder.WriteString(c + "   " +
 							colorf(fmt.Sprintf("%5.2f%%%% - %s", v[n][2].(float64)*100, v[n][0]), pieColors[n]) + "\n")
@@ -263,7 +263,7 @@ func histf(title string, body map[string][][]interface{}) {
 			} else {
 				first = false
 			}
-			builder.WriteString(colorf(strings.ToUpper(k), colorLightGreen) + "\n\n")
+			builder.WriteString(colorf("Type: "+k, colorLightGreen) + "\n\n")
 			var (
 				maxNameLen  int
 				maxCountLen int
@@ -324,13 +324,15 @@ func printFacet(result *zoomeye.SearchResult, facets []string, figure string) {
 	var (
 		head = [][2]interface{}{
 			[2]interface{}{"Type", 10},
-			[2]interface{}{"Facet", 35},
+			[2]interface{}{"Name", 35},
 			[2]interface{}{"Count", 20},
 		}
 		body = make(map[string][][]interface{})
 	)
-	for _, s := range facets {
-		if s = strings.ToLower(strings.TrimSpace(s)); result.Type == "host" && s == "app" {
+	for _, f := range facets {
+		f = strings.ToLower(strings.TrimSpace(f))
+		s := f
+		if result.Type == "host" && f == "app" {
 			s = "product"
 		}
 		if facet, ok := result.Facets[s]; ok {
@@ -350,16 +352,16 @@ func printFacet(result *zoomeye.SearchResult, facets []string, figure string) {
 				group = append(group, []interface{}{omitStr(name, 35), v.Count,
 					float64(v.Count) / float64(result.Total)})
 			}
-			body[s] = group
+			body[f] = group
 		}
 	}
 	switch figure {
 	case "":
-		tablef("Facets Info", head, body, false)
+		tablef("ZoomEye Facets", head, body, false)
 	case "pie":
-		pief("Facets Pie", body)
+		pief("ZoomEye Facets - PIE", body)
 	case "hist":
-		histf("Facets Histogram", body)
+		histf("ZoomEye Facets - HIST", body)
 	}
 }
 
@@ -384,11 +386,11 @@ func printStat(result *zoomeye.SearchResult, keys []string, figure string) {
 	}
 	switch figure {
 	case "":
-		tablef("Statistics Info", head, body, false)
+		tablef("Result Statistics", head, body, false)
 	case "pie":
-		pief("Statistics Pie", body)
+		pief("Result Statistics - PIE", body)
 	case "hist":
-		histf("Statistics Histogram", body)
+		histf("Result Statistics - HIST", body)
 	}
 }
 
@@ -438,7 +440,7 @@ func printFilter(result *zoomeye.SearchResult, keys []string) {
 			"items": items,
 		}
 	}
-	htablef("Filtered Data", body, [3]int{30, 15, 75}, true)
+	htablef("Result Filtered", body, [3]int{30, 15, 75}, true)
 }
 
 func withVersion(o interface{}) string {

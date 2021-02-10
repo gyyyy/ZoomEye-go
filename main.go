@@ -1,19 +1,11 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 )
-
-func init() {
-	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", filepath.Base(os.Args[0]))
-		flag.PrintDefaults()
-	}
-}
 
 func help() {
 	fmt.Printf("Usage of %s:\n"+
@@ -29,18 +21,13 @@ func help() {
 func main() {
 	var (
 		agent = NewAgent()
-		n     = len(os.Args)
+		cmd   string
 	)
-	if n == 1 {
-		// TODO: user interact mode
-		warnf("User-Interact mode is coming soon, please run <zoomeye -h> for help")
-		return
-	}
-	cmd := strings.ToLower(os.Args[1])
-	if n > 2 {
+	if len(os.Args) > 1 {
+		cmd = os.Args[1]
 		os.Args = append(os.Args[0:1], os.Args[2:]...)
 	}
-	switch cmd {
+	switch strings.ToLower(cmd) {
 	case "init":
 		cmdInit(agent)
 	case "info":
@@ -53,6 +40,8 @@ func main() {
 		cmdClean(agent)
 	case "help", "-help", "--help", "-h", "?":
 		help()
+	case "":
+		warnf("Cli-User-Interact mode is coming soon, please run <zoomeye -h> for help")
 	default:
 		warnf("input parameter error, please run <zoomeye -h> for help")
 	}

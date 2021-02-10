@@ -56,7 +56,7 @@ EXPIRED_TIME: 432000
 ./ZoomEye-go init -apikey "XXXXXXXX-XXXX-XXXXX-XXXX-XXXXXXXXXXX"
 succeed to initialize
 
-[Resources Info]
+[ZoomEye Resources Info]
 
   Role:  developer
   Quota: 10000
@@ -75,7 +75,7 @@ succeed to initialize
 ./ZoomEye-go info
 succeed to query
 
-[Resources Info]
+[ZoomEye Resources Info]
 
   Role:  developer
   Quota: 10000
@@ -87,7 +87,6 @@ succeed to query
 搜索是 `ZoomEye-go` 最核心的功能，通过 `search` 命令指定搜索关键词进行使用，支持的参数说明如下：
 
 ```text
--dork [KEYWORDS]     设置搜索关键字，必填（如：-dork "port:80 nginx"）
 -num [NUM]           设置显示/搜索的数据条数，默认为 20（建议设置20的倍数，因为ZoomEye一次接口查询为20条）
 -type [host/web]     设置搜索资源类型，默认为 host（如：-type "web"）
 -force               强制调用 ZoomEye API 查询，忽略本地数据和缓存
@@ -111,15 +110,15 @@ succeed to query
 使用示例：
 
 ```bash
-./ZoomEye-go search -dork "telnet" -count
+./ZoomEye-go search "telnet" -count
 succeed to search (in 272.080753ms)
 
-[Total Count]
+[ZoomEye Total]
 
   Count: 57003299
 
 
-./ZoomEye-go search -dork "telnet" -num 1
+./ZoomEye-go search "telnet" -num 1
 succeed to search (in 370.930383ms)
 
 [Host Search Result]
@@ -133,12 +132,12 @@ succeed to search (in 370.930383ms)
   +-----------------------+----------------------+----------------------+------------------------------------------+----------------------+
 
 
-./ZoomEye-go search -dork "weblogic" -facet "country" -figure "hist"
+./ZoomEye-go search "weblogic" -facet "country" -figure "hist"
 succeed to search (in 177.088662ms)
 
-[Facets Histogram]
+[ZoomEye Facets - HIST]
 
-  COUNTRY
+  Type: country
   
   United States  [232751]  ▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉
           Japan  [ 45285]  ▉▉▉▉▉▉▉
@@ -163,7 +162,7 @@ succeed to search (in 177.088662ms)
 
 #### 加载分析本地数据
 
-`ZoomEye-go` 也可以通过 `load` 命令加载本地数据，并将它解析成搜索结果数据类型，支持与 `search` 命令类似的 `-count` 、 `-facet` 、 `-stat` 、 `-figure` 和 `-filter` 参数对数据进行统计分析，不同的是，`-save` 参数仅会保存 `-filter` 的执行结果。
+`ZoomEye-go` 也可以通过 `load` 命令加载本地数据文件，并将它解析成搜索结果数据类型，支持与 `search` 命令类似的 `-count` 、 `-facet` 、 `-stat` 、 `-figure` 和 `-filter` 参数对数据进行统计分析。不同的是，`-save` 参数仅会保存 `-filter` 的执行结果。
 
 可以通过 `load -h` 获取帮助。
 
