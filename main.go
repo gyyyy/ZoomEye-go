@@ -38,11 +38,11 @@ func main() {
 		cmdLoad(agent)
 	case "clean":
 		cmdClean(agent)
-	case "help", "-help", "--help", "-h", "?":
+	case "help", "-help", "--help", "-h", "--h", "?":
 		help()
 	case "":
 		warnf("Cli-User-Interact mode is coming soon, please run <zoomeye -h> for help")
 	default:
-		warnf("input parameter error, please run <zoomeye -h> for help")
+		warnf("unsupported command please run <zoomeye -h> for help")
 	}
 }

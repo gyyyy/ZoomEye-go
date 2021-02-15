@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 const (
@@ -23,6 +24,7 @@ const (
 )
 
 var httpCli = &http.Client{
+	Timeout: 30 * time.Second,
 	Transport: &http.Transport{
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
@@ -135,9 +137,7 @@ func (z *ZoomEye) DorkSearch(dork string, page int, resource string, facet strin
 	if page <= 0 {
 		page = 1
 	}
-	if resource != "" {
-		resource = strings.ToLower(resource)
-	} else {
+	if resource = strings.ToLower(resource); resource != "web" {
 		resource = "host"
 	}
 	if facet == "" {

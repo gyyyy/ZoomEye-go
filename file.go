@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -67,8 +68,24 @@ func readFile(path string) ([]byte, error) {
 	return ioutil.ReadFile(path)
 }
 
+func readObject(dst interface{}, path string) error {
+	b, err := readFile(path)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(b, dst)
+}
+
 func writeFile(path string, data []byte) error {
 	return ioutil.WriteFile(path, data, 0o600)
+}
+
+func writeObject(path string, src interface{}) error {
+	b, err := json.Marshal(src)
+	if err != nil {
+		return err
+	}
+	return writeFile(path, b)
 }
 
 func appendToFile(path string, data []byte) error {
@@ -77,6 +94,8 @@ func appendToFile(path string, data []byte) error {
 		return err
 	}
 	defer f.Close()
-	_, err = f.Write(append(data, '\n'))
+	if data != nil && len(data) > 0 {
+		_, err = f.Write(append(data, '\n'))
+	}
 	return err
 }

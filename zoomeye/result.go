@@ -179,12 +179,14 @@ type SearchResult struct {
 // Sites finds ip and site in web search results
 func (r *SearchResult) Sites() []map[string]string {
 	m := make([]map[string]string, 0, len(r.Matches))
-	for _, v := range r.Matches {
-		if ip := v.FindString("ip"); ip != "" {
-			m = append(m, map[string]string{
-				"ip":   ip,
-				"site": v.FindString("site"),
-			})
+	if r.Type == "web" {
+		for _, v := range r.Matches {
+			if ip := v.FindString("ip"); ip != "" {
+				m = append(m, map[string]string{
+					"ip":   ip,
+					"site": v.FindString("site"),
+				})
+			}
 		}
 	}
 	return m
@@ -193,15 +195,14 @@ func (r *SearchResult) Sites() []map[string]string {
 // Hosts finds ip and port in host search results
 func (r *SearchResult) Hosts() []map[string]string {
 	m := make([]map[string]string, 0, len(r.Matches))
-	if r.Type != "host" {
-
-	}
-	for _, v := range r.Matches {
-		if ip := v.FindString("ip"); ip != "" {
-			m = append(m, map[string]string{
-				"ip":   ip,
-				"port": v.FindString("portinfo.port"),
-			})
+	if r.Type == "host" {
+		for _, v := range r.Matches {
+			if ip := v.FindString("ip"); ip != "" {
+				m = append(m, map[string]string{
+					"ip":   ip,
+					"port": v.FindString("portinfo.port"),
+				})
+			}
 		}
 	}
 	return m

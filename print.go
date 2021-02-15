@@ -80,8 +80,10 @@ func infof(title, format string, a ...interface{}) {
 	if title != "" {
 		format = "\n" + colorf("["+title+"]", colorLightCyan) + "\n\n" +
 			colorf("  "+strings.ReplaceAll(format, "\n", "\n  "), colorLightWhite) + "\n"
+		print(fmt.Sprintf(format, a...), "")
+	} else {
+		print(fmt.Sprintf(format, a...), colorWhite)
 	}
-	print(fmt.Sprintf(format, a...), "")
 }
 
 func tablef(title string, head [][2]interface{}, body map[string][][]interface{}, count bool) {

@@ -3,7 +3,6 @@ package main
 import (
 	"ZoomEye-go/zoomeye"
 	"crypto/md5"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -16,16 +15,16 @@ import (
 
 // NoAuthKeyErr represents error of no any Auth Keys
 type NoAuthKeyErr struct {
-	err error
+	msg string
 }
 
 func (e *NoAuthKeyErr) Error() string {
-	return e.err.Error()
+	return e.msg
 }
 
 func noAuthKey(err error) *NoAuthKeyErr {
 	return &NoAuthKeyErr{
-		err: err,
+		msg: err.Error(),
 	}
 }
 
@@ -185,12 +184,8 @@ func (a *ZoomEyeAgent) fromLocal(name string) (*zoomeye.SearchResult, bool) {
 	if info, err := os.Stat(path); err != nil || a.isExpiredData(info.ModTime()) {
 		return nil, false
 	}
-	b, err := readFile(path)
-	if err != nil {
-		return nil, false
-	}
 	result := &zoomeye.SearchResult{}
-	if err = json.Unmarshal(b, result); err != nil {
+	if readObject(result, path) != nil {
 		return nil, false
 	}
 	return result, true
@@ -213,26 +208,34 @@ func (a *ZoomEyeAgent) fromCache(name string) (*zoomeye.SearchResult, bool) {
 	if !a.hasCached(path) {
 		return nil, false
 	}
-	b, err := readFile(path)
-	if err != nil {
-		return nil, false
-	}
 	result := &zoomeye.SearchResult{}
-	if err = json.Unmarshal(b, result); err != nil {
+	if readObject(result, path) != nil {
 		return nil, false
 	}
 	return result, true
 }
 
 func (a *ZoomEyeAgent) cache(name string, result *zoomeye.SearchResult) error {
-	var (
-		path   = filepath.Join(a.conf.CachePath, name)
-		b, err = json.Marshal(result)
-	)
+	return writeObject(filepath.Join(a.conf.CachePath, name), result)
+}
+
+func (a *ZoomEyeAgent) forceSearch(dork string, maxPage int, resource string) (*zoomeye.SearchResult, error) {
+	results, err := a.zoom.MultiPageSearch(dork, maxPage, resource, "")
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return writeFile(path, b)
+	result := &zoomeye.SearchResult{
+		Type: resource,
+	}
+	for i, n := 0, len(results); i < maxPage && n > 0; i++ {
+		page := i + 1
+		if res, ok := results[page]; ok {
+			a.cache(filename(resource, dork, page, true), res)
+			result.Extend(res)
+			n--
+		}
+	}
+	return result, nil
 }
 
 // Search gets search results from local, cache or API
@@ -245,32 +248,15 @@ func (a *ZoomEyeAgent) Search(dork string, num int, resource string, force bool)
 	if num <= 0 {
 		num = 20
 	}
-	if resource != "" {
-		resource = strings.ToLower(resource)
-	} else {
-		resource = "host"
-	}
 	maxPage := num / 20
 	if num%20 > 0 {
 		maxPage++
 	}
+	if resource = strings.ToLower(resource); resource != "web" {
+		resource = "host"
+	}
 	if force {
-		results, err := a.zoom.MultiPageSearch(dork, maxPage, resource, "")
-		if err != nil {
-			return nil, err
-		}
-		result := &zoomeye.SearchResult{
-			Type: resource,
-		}
-		for i, n := 0, len(results); i < maxPage && n > 0; i++ {
-			page := i + 1
-			if res, ok := results[page]; ok {
-				a.cache(filename(resource, dork, page, true), res)
-				result.Extend(res)
-				n--
-			}
-		}
-		return result, nil
+		return a.forceSearch(dork, maxPage, resource)
 	}
 	result, ok := a.fromLocal(filename(resource, url.QueryEscape(dork), num, false))
 	if ok {
@@ -291,9 +277,7 @@ func (a *ZoomEyeAgent) Search(dork string, num int, resource string, force bool)
 			if res, err = a.zoom.DorkSearch(dork, page, resource, ""); err != nil {
 				return nil, err
 			}
-			if err = a.cache(name, res); err != nil {
-				return nil, err
-			}
+			a.cache(name, res)
 		}
 		result.Extend(res)
 	}
@@ -304,30 +288,20 @@ func (a *ZoomEyeAgent) Search(dork string, num int, resource string, force bool)
 }
 
 // SaveFilterData writes the filter data to local file
-func (a *ZoomEyeAgent) SaveFilterData(data []map[string]interface{}, path string) error {
+func (a *ZoomEyeAgent) SaveFilterData(path string, data []map[string]interface{}) error {
 	if data == nil || len(data) == 0 {
 		return fmt.Errorf("no any filter datas")
 	}
-	b, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-	return writeFile(path, b)
+	return writeObject(path, data)
 }
 
 // Save writes the search results (and filter data) to local file
-func (a *ZoomEyeAgent) Save(result *zoomeye.SearchResult, name string) (string, error) {
-	var (
-		path      = filepath.Join(a.conf.DataPath, name+".json")
-		data, err = json.Marshal(result)
-	)
-	if err != nil {
-		data = []byte("{}")
-	}
-	if err = writeFile(path, data); err != nil {
+func (a *ZoomEyeAgent) Save(name string, result *zoomeye.SearchResult) (string, error) {
+	path := filepath.Join(a.conf.DataPath, name+".json")
+	if err := writeObject(path, result); err != nil {
 		return "", err
 	}
-	a.SaveFilterData(result.FilterCache, filepath.Join(a.conf.DataPath, name+"_filtered.json"))
+	a.SaveFilterData(filepath.Join(a.conf.DataPath, name+"_filtered.json"), result.FilterCache)
 	path, _ = filepath.Abs(path)
 	return path, nil
 }
@@ -337,14 +311,10 @@ func (a *ZoomEyeAgent) Load(path string) (*zoomeye.SearchResult, error) {
 	if _, err := os.Stat(path); err != nil {
 		return nil, err
 	}
-	b, err := readFile(path)
-	if err != nil {
-		return nil, err
-	}
 	result := &zoomeye.SearchResult{
 		Type: "host",
 	}
-	if err = json.Unmarshal(b, result); err != nil {
+	if err := readObject(result, path); err != nil {
 		return nil, err
 	}
 	if len(result.Matches) > 0 && result.Matches[0].Find("site") != nil {
