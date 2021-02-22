@@ -20,7 +20,7 @@
 
 #### 基础配置
 
-在 `ZoomEye-go` 二进制文件同目录下创建 `conf.yaml` 文件，对配置变量进行自定义设置：
+在 `ZoomEye-go` 二进制文件同目录下创建 `conf.yml` 文件，对配置变量进行自定义设置：
 
 ```yaml
 # API-Key和JWT存放路径
@@ -36,7 +36,7 @@ ZOOMEYE_DATA_PATH: "data"
 EXPIRED_TIME: 432000
 ```
 
-若不创建或修改配置文件，`ZoomEye-go` 相关文件路径和其他参数默认值都将与 [`conf_default.yaml`](conf_default.yaml) 描述一致。
+若不创建或修改配置文件，`ZoomEye-go` 相关文件路径和其他参数默认值都将与 [`conf_default.yml`](conf_default.yml) 描述一致。
 
 #### 初始化用户凭证
 

@@ -50,7 +50,7 @@ func (c *config) check() {
 	}
 	if checkFolder(&c.ConfigPath) == nil {
 		if b, err := yaml.Marshal(c); err == nil {
-			writeFile(filepath.Join(c.ConfigPath, "conf.yaml"), b)
+			writeFile(filepath.Join(c.ConfigPath, "conf.yml"), b)
 		}
 	}
 	checkFolder(&c.CachePath)
@@ -61,7 +61,7 @@ func newConfig() *config {
 	conf := &config{}
 	defer conf.check()
 	var (
-		path   = "conf.yaml"
+		path   = "conf.yml"
 		b, err = readFile(path)
 	)
 	if err != nil {
