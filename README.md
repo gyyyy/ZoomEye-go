@@ -174,7 +174,7 @@ succeed to search (in 177.088662ms)
 package main
 
 import (
-	"ZoomEye-go/zoomeye"
+	"github.com/gyyyy/ZoomEye-go/zoomeye"
 )
 
 func main() {

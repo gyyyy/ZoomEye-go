@@ -1,4 +1,4 @@
-module ZoomEye-go
+module github.com/gyyyy/ZoomEye-go
 
 go 1.15
 
