@@ -62,7 +62,7 @@ func TestMultiPageSearch(t *testing.T) {
 	if err != nil || (len(results) == 0) {
 		t.FailNow()
 	}
-	t.Log(results[1].Total, results[1].Type)
+	t.Log(results[1].Total, results[1].Type, len(results))
 }
 
 func TestMultiToOneSearch(t *testing.T) {
@@ -73,7 +73,7 @@ func TestMultiToOneSearch(t *testing.T) {
 	if err != nil || (len(result.Matches) != maxPage*20) {
 		t.FailNow()
 	}
-	t.Log(result.Total, result.Type)
+	t.Log(result.Total, result.Type, len(result.Matches))
 }
 
 func TestFilter(t *testing.T) {

@@ -166,7 +166,7 @@ func (z *ZoomEye) DorkSearch(dork string, page int, resource string, facet strin
 func (z *ZoomEye) conMPSearch(dork string, maxPage int, resource string, facet string) (map[int]*SearchResult, error) {
 	var (
 		results     = make(map[int]*SearchResult)
-		ch          = make(chan map[string]interface{}, maxPage)
+		ch          = make(chan map[string]interface{}, maxPage-1)
 		ctx, cancel = context.WithCancel(context.Background())
 	)
 	defer close(ch)
@@ -175,10 +175,10 @@ func (z *ZoomEye) conMPSearch(dork string, maxPage int, resource string, facet s
 		wg        sync.WaitGroup
 		groupSize = 20
 	)
-	if maxPage < 20 {
-		groupSize = maxPage
+	if maxPage < 21 {
+		groupSize = maxPage - 1
 	}
-	var currPage int32
+	var currPage int32 = 1
 	for i := 0; i < groupSize; i++ {
 		wg.Add(1)
 		go func() {
@@ -244,19 +244,53 @@ func (z *ZoomEye) MultiPageSearch(dork string, maxPage int, resource string, fac
 	if maxPage <= 0 {
 		maxPage = 1
 	}
-	if maxPage >= 5 {
-		return z.conMPSearch(dork, maxPage, resource, facet)
+	info, err := z.ResourcesInfo()
+	if err != nil {
+		return nil, err
 	}
-	var (
-		results = make(map[int]*SearchResult)
-		err     error
-	)
-	for i := 0; i < maxPage; i++ {
-		var (
-			page     = i + 1
-			res, err = z.DorkSearch(dork, page, resource, facet)
-		)
+	allowPage := info.Resources.Search / 20
+	if info.Resources.Search%20 > 0 {
+		allowPage++
+	}
+	results := make(map[int]*SearchResult)
+	if allowPage > 0 {
+		res, err := z.DorkSearch(dork, 1, resource, facet)
 		if err != nil {
+			return nil, err
+		}
+		results[1] = res
+		n := int(res.Total / 20)
+		if res.Total%20 > 0 {
+			n++
+		}
+		if n < allowPage {
+			allowPage = n
+		}
+	}
+	if maxPage > allowPage {
+		maxPage = allowPage
+	}
+	if maxPage > 5 {
+		corResults, err := z.conMPSearch(dork, maxPage, resource, facet)
+		if err != nil {
+			if len(results) > 0 {
+				return results, nil
+			}
+			return nil, err
+		}
+		for k, v := range results {
+			if _, ok := corResults[k]; !ok {
+				corResults[k] = v
+			}
+		}
+		return corResults, nil
+	}
+	for i := 1; i < maxPage; i++ {
+		var (
+			page = i + 1
+			res  *SearchResult
+		)
+		if res, err = z.DorkSearch(dork, page, resource, facet); err != nil {
 			break
 		}
 		results[page] = res
