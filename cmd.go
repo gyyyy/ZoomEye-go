@@ -1,7 +1,6 @@
 package main
 
 import (
-	"ZoomEye-go/zoomeye"
 	"flag"
 	"fmt"
 	"net/url"
@@ -9,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/gyyyy/ZoomEye-go/zoomeye"
 )
 
 func usage(cmd string, examples ...string) func() {

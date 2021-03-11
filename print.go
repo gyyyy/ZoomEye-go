@@ -1,11 +1,12 @@
 package main
 
 import (
-	"ZoomEye-go/zoomeye"
 	"fmt"
 	"math"
 	"sort"
 	"strings"
+
+	"github.com/gyyyy/ZoomEye-go/zoomeye"
 )
 
 const (

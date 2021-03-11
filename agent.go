@@ -1,7 +1,6 @@
 package main
 
 import (
-	"ZoomEye-go/zoomeye"
 	"crypto/md5"
 	"fmt"
 	"net/url"
@@ -10,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gyyyy/ZoomEye-go/zoomeye"
 	"gopkg.in/yaml.v2"
 )
 
