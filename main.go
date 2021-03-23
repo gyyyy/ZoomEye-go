@@ -13,7 +13,7 @@ func help() {
 		"  info\n        Query resources information\n"+
 		"  search\n        Search results from local, cache or API\n"+
 		"  load\n        Load results from local data file\n"+
-		"  clean\n        Removes all cache data\n"+
+		"  clear\n        Removes all cache and setting data\n"+
 		"  help\n        Usage of ZoomEye-go\n",
 		filepath.Base(os.Args[0]))
 }
@@ -36,8 +36,8 @@ func main() {
 		cmdSearch(agent)
 	case "load":
 		cmdLoad(agent)
-	case "clean":
-		cmdClean(agent)
+	case "clear":
+		cmdClear(agent)
 	case "help", "-help", "--help", "-h", "--h", "?":
 		help()
 	case "":

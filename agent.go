@@ -37,10 +37,10 @@ type config struct {
 
 func (c *config) check() {
 	if c.ConfigPath == "" {
-		c.ConfigPath = "~/.config/zoomeye/setting"
+		c.ConfigPath = abs("~/.config/zoomeye/setting")
 	}
 	if c.CachePath == "" {
-		c.CachePath = "~/.config/zoomeye/cache"
+		c.CachePath = abs("~/.config/zoomeye/cache")
 	}
 	if c.DataPath == "" {
 		c.DataPath = "data"
@@ -48,17 +48,17 @@ func (c *config) check() {
 	if c.ExpiredSec == 0 {
 		c.ExpiredSec = 432000
 	}
-	if checkFolder(&c.ConfigPath) == nil {
+	if checkFolder(c.ConfigPath) == nil && checkFolder(c.CachePath) == nil && checkFolder(c.DataPath) == nil {
 		if b, err := yaml.Marshal(c); err == nil {
 			writeFile(filepath.Join(c.ConfigPath, "conf.yml"), b)
 		}
 	}
-	checkFolder(&c.CachePath)
-	checkFolder(&c.DataPath)
 }
 
 func newConfig() *config {
-	conf := &config{}
+	conf := &config{
+		ConfigPath: abs("~/.config/zoomeye/setting"),
+	}
 	defer conf.check()
 	var (
 		path   = "conf.yml"
@@ -68,8 +68,7 @@ func newConfig() *config {
 		if !os.IsNotExist(err) {
 			return conf
 		}
-		path = filepath.Join("~/.config/zoomeye/setting", path)
-		if b, err = readFile(path); err != nil && !os.IsNotExist(err) {
+		if b, err = readFile(filepath.Join(conf.ConfigPath, path)); err != nil && !os.IsNotExist(err) {
 			return conf
 		}
 	}
@@ -323,9 +322,18 @@ func (a *ZoomEyeAgent) Load(path string) (*zoomeye.SearchResult, error) {
 	return result, nil
 }
 
-// Clean removes all cache data
-func (a *ZoomEyeAgent) Clean() {
-	os.RemoveAll(a.conf.CachePath)
+// Clear removes all cache or setting data
+func (a *ZoomEyeAgent) Clear(cache, setting bool) {
+	if cache {
+		os.RemoveAll(a.conf.CachePath)
+	}
+	if setting {
+		os.RemoveAll(a.conf.ConfigPath)
+		os.MkdirAll(a.conf.ConfigPath, os.ModePerm)
+		if b, err := yaml.Marshal(a.conf); err == nil {
+			writeFile(filepath.Join(a.conf.ConfigPath, "conf.yml"), b)
+		}
+	}
 }
 
 // NewAgent creates instance of ZoomEyeAgent

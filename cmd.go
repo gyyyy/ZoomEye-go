@@ -25,7 +25,7 @@ func usage(cmd string, examples ...string) func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "\nUsage of %s (%s):\n", filepath.Base(os.Args[0]), cmd)
 		flag.PrintDefaults()
 		if example != "" {
-			fmt.Fprintf(flag.CommandLine.Output(), example)
+			fmt.Fprintf(flag.CommandLine.Output(), "\n"+example)
 		}
 	}
 }
@@ -212,7 +212,15 @@ func cmdLoad(agent *ZoomEyeAgent) {
 	})
 }
 
-func cmdClean(agent *ZoomEyeAgent) {
-	agent.Clean()
-	successf("succeed to clean all cache data")
+func cmdClear(agent *ZoomEyeAgent) {
+	var args struct {
+		cache   bool
+		setting bool
+	}
+	flag.BoolVar(&args.cache, "cache", false, "local cache file")
+	flag.BoolVar(&args.setting, "setting", false, "user api key and access token")
+	flag.Usage = usage("clear", `-cache`, `-cache -setting`)
+	flag.Parse()
+	agent.Clear(args.cache, args.setting)
+	successf("succeed to clear data")
 }

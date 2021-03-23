@@ -48,20 +48,24 @@ func home() string {
 	return unixHome()
 }
 
-func checkFolder(dir *string) error {
-	if strings.HasPrefix(*dir, "~/") {
+func abs(dir string) string {
+	if strings.HasPrefix(dir, "~/") {
 		if base := home(); base != "" {
-			*dir = filepath.Join(base, strings.TrimPrefix(*dir, "~/"))
+			return filepath.Join(base, strings.TrimPrefix(dir, "~/"))
 		}
 	}
-	if info, err := os.Stat(*dir); err != nil {
+	return dir
+}
+
+func checkFolder(dir string) error {
+	if info, err := os.Stat(dir); err != nil {
 		if !os.IsNotExist(err) {
 			return err
 		}
 	} else if info != nil && info.IsDir() {
 		return nil
 	}
-	return os.MkdirAll(*dir, os.ModePerm)
+	return os.MkdirAll(dir, os.ModePerm)
 }
 
 func readFile(path string) ([]byte, error) {
