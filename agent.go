@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/md5"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -92,6 +93,31 @@ type ZoomEyeAgent struct {
 	conf *config
 }
 
+func (a *ZoomEyeAgent) isExpiredData(t time.Time) bool {
+	return time.Now().Sub(t) > (time.Duration(a.conf.ExpiredSec) * time.Second)
+}
+
+func (a *ZoomEyeAgent) hasCached(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	if a.isExpiredData(info.ModTime()) {
+		os.Remove(path)
+		return false
+	}
+	return true
+}
+
+func (a *ZoomEyeAgent) fromCache(name string, result interface{}) bool {
+	path := filepath.Join(a.conf.CachePath, name)
+	return a.hasCached(path) && readObject(result, path) == nil
+}
+
+func (a *ZoomEyeAgent) cache(name string, result interface{}) error {
+	return writeObject(filepath.Join(a.conf.CachePath, name), result)
+}
+
 // InitByKey initializes ZoomEye by API-Key
 func (a *ZoomEyeAgent) InitByKey(apiKey string) (*zoomeye.ResourcesInfoResult, error) {
 	var (
@@ -174,10 +200,6 @@ func (a *ZoomEyeAgent) Info() (*zoomeye.ResourcesInfoResult, error) {
 	return a.zoom.ResourcesInfo()
 }
 
-func (a *ZoomEyeAgent) isExpiredData(t time.Time) bool {
-	return time.Now().Sub(t) > (time.Duration(a.conf.ExpiredSec) * time.Second)
-}
-
 func (a *ZoomEyeAgent) fromLocal(name string) (*zoomeye.SearchResult, bool) {
 	path := filepath.Join(a.conf.DataPath, name)
 	if info, err := os.Stat(path); err != nil || a.isExpiredData(info.ModTime()) {
@@ -188,34 +210,6 @@ func (a *ZoomEyeAgent) fromLocal(name string) (*zoomeye.SearchResult, bool) {
 		return nil, false
 	}
 	return result, true
-}
-
-func (a *ZoomEyeAgent) hasCached(path string) bool {
-	info, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-	if a.isExpiredData(info.ModTime()) {
-		os.Remove(path)
-		return false
-	}
-	return true
-}
-
-func (a *ZoomEyeAgent) fromCache(name string) (*zoomeye.SearchResult, bool) {
-	path := filepath.Join(a.conf.CachePath, name)
-	if !a.hasCached(path) {
-		return nil, false
-	}
-	result := &zoomeye.SearchResult{}
-	if readObject(result, path) != nil {
-		return nil, false
-	}
-	return result, true
-}
-
-func (a *ZoomEyeAgent) cache(name string, result *zoomeye.SearchResult) error {
-	return writeObject(filepath.Join(a.conf.CachePath, name), result)
 }
 
 func (a *ZoomEyeAgent) forceSearch(dork string, maxPage int, resource string) (*zoomeye.SearchResult, error) {
@@ -271,7 +265,7 @@ func (a *ZoomEyeAgent) Search(dork string, num int, resource string, force bool)
 			page = i + 1
 			name = filename(resource, dork, page, true)
 		)
-		if res, ok = a.fromCache(name); !ok {
+		if !a.fromCache(name, res) {
 			var err error
 			if res, err = a.zoom.DorkSearch(dork, page, resource, ""); err != nil {
 				return nil, err
@@ -284,25 +278,6 @@ func (a *ZoomEyeAgent) Search(dork string, num int, resource string, force bool)
 		result.Matches = result.Matches[:num]
 	}
 	return result, nil
-}
-
-// SaveFilterData writes the filter data to local file
-func (a *ZoomEyeAgent) SaveFilterData(path string, data []map[string]interface{}) error {
-	if data == nil || len(data) == 0 {
-		return fmt.Errorf("no any filter datas")
-	}
-	return writeObject(path, data)
-}
-
-// Save writes the search results (and filter data) to local file
-func (a *ZoomEyeAgent) Save(name string, result *zoomeye.SearchResult) (string, error) {
-	path := filepath.Join(a.conf.DataPath, name+".json")
-	if err := writeObject(path, result); err != nil {
-		return "", err
-	}
-	a.SaveFilterData(filepath.Join(a.conf.DataPath, name+"_filtered.json"), result.FilterCache)
-	path, _ = filepath.Abs(path)
-	return path, nil
 }
 
 // Load reads local data, and unmarshals to search results
@@ -322,6 +297,48 @@ func (a *ZoomEyeAgent) Load(path string) (*zoomeye.SearchResult, error) {
 	return result, nil
 }
 
+// History gets query results of device history by IP
+func (a *ZoomEyeAgent) History(ip string, force bool) (*zoomeye.HistoryResult, error) {
+	if net.ParseIP(ip) == nil {
+		return nil, fmt.Errorf("invalid ip address")
+	}
+	info, err := a.Info()
+	if err != nil {
+		return nil, err
+	}
+	switch strings.ToLower(info.Plan) {
+	case "user", "developer":
+		return nil, fmt.Errorf("this function is only open to advanced users and VIP users.")
+	}
+	var (
+		result *zoomeye.HistoryResult
+		name   = fmt.Sprintf("%x", md5.Sum([]byte("history_"+ip))) + ".json"
+		ok     bool
+	)
+	if !force {
+		result = &zoomeye.HistoryResult{}
+		ok = a.fromCache(name, result)
+	}
+	if !ok {
+		if result, err = a.zoom.HistoryIP(ip); err != nil {
+			return nil, err
+		}
+		if result.Count == 0 || len(result.Data) == 0 {
+			return result, nil
+		}
+		a.cache(name, result)
+	}
+	for i := 0; i < len(result.Data); {
+		if _, ok := result.Data[i]["component"]; ok {
+			result.Data = append(result.Data[:i], result.Data[i+1:]...)
+		} else {
+			i++
+		}
+	}
+	result.Count = uint64(len(result.Data))
+	return result, nil
+}
+
 // Clear removes all cache or setting data
 func (a *ZoomEyeAgent) Clear(cache, setting bool) {
 	if cache {
@@ -334,6 +351,24 @@ func (a *ZoomEyeAgent) Clear(cache, setting bool) {
 			writeFile(filepath.Join(a.conf.ConfigPath, "conf.yml"), b)
 		}
 	}
+}
+
+// SaveFilterData writes the filter data to local file
+func (a *ZoomEyeAgent) SaveFilterData(path string, data []map[string]interface{}) error {
+	if data == nil || len(data) == 0 {
+		return fmt.Errorf("no any filter datas")
+	}
+	return writeObject(path, data)
+}
+
+// Save writes the search results (and filter data) to local file
+func (a *ZoomEyeAgent) Save(name string, result *zoomeye.SearchResult) (string, error) {
+	path := filepath.Join(a.conf.DataPath, name+".json")
+	if err := writeObject(path, result); err != nil {
+		return "", err
+	}
+	path, _ = filepath.Abs(path)
+	return path, nil
 }
 
 // NewAgent creates instance of ZoomEyeAgent

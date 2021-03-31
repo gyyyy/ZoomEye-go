@@ -10,7 +10,7 @@ import (
 
 var (
 	statisticsFields = map[string]map[string]string{
-		"host": map[string]string{
+		"host": {
 			"app":     "portinfo.app",
 			"device":  "portinfo.device",
 			"service": "portinfo.service",
@@ -19,7 +19,7 @@ var (
 			"country": "geoinfo.country.names.en",
 			"city":    "geoinfo.city.names.en",
 		},
-		"web": map[string]string{
+		"web": {
 			"webapp":    "webapp",
 			"component": "component",
 			"framework": "framework",
@@ -32,7 +32,7 @@ var (
 		},
 	}
 	filterFields = map[string]map[string]string{
-		"host": map[string]string{
+		"host": {
 			"_index":   "ip",
 			"app":      "portinfo.app",
 			"version":  "portinfo.version",
@@ -44,8 +44,9 @@ var (
 			"country":  "geoinfo.country.names.en",
 			"asn":      "geoinfo.asn",
 			"banner":   "portinfo.banner",
+			"time":     "timestamp",
 		},
-		"web": map[string]string{
+		"web": {
 			"_index":   "site",
 			"app":      "webapp",
 			"headers":  "headers",
@@ -55,7 +56,15 @@ var (
 			"site":     "site",
 			"city":     "geoinfo.city.names.en",
 			"country":  "geoinfo.country.names.en",
+			"time":     "timestamp",
 		},
+	}
+	historyFilterFields = map[string]string{
+		"time":    "timestamp",
+		"port":    "portinfo.port",
+		"service": "portinfo.service",
+		"app":     "portinfo.product",
+		"raw":     "raw_data",
 	}
 )
 
@@ -93,10 +102,22 @@ func (m findableMap) Find(expr string) interface{} {
 }
 
 func (m findableMap) FindString(expr string) string {
-	if v := m.Find(expr); v != nil {
+	switch v := m.Find(expr).(type) {
+	case nil:
+		return ""
+	case string:
+		return v
+	case []string:
+		return strings.Join(v, ",")
+	case []interface{}:
+		s := make([]string, len(v))
+		for i, o := range v {
+			s[i] = fmt.Sprintf("%v", o)
+		}
+		return strings.Join(s, ",")
+	default:
 		return fmt.Sprintf("%v", v)
 	}
-	return ""
 }
 
 // ErrorResult represents result of error
@@ -173,7 +194,6 @@ type SearchResult struct {
 		Name  interface{} `json:"name"`
 		Count uint64      `json:"count"`
 	} `json:"facets"`
-	FilterCache []map[string]interface{} `json:"-"`
 }
 
 // Sites finds ip and site in web search results
@@ -268,13 +288,14 @@ func (r *SearchResult) Filter(keys ...string) []map[string]interface{} {
 	if !ok {
 		return filtered
 	}
-	if n == 1 && keys[0] == "*" {
+	if n == 1 && (keys[0] == "" || keys[0] == "*") {
 		keys = make([]string, 0, len(fields))
 		for k := range fields {
 			keys = append(keys, k)
 		}
+	} else {
+		keys = append(keys, "_index")
 	}
-	keys = append(keys, "_index")
 	for _, v := range r.Matches {
 		var (
 			item     = make(map[string]interface{})
@@ -299,9 +320,9 @@ func (r *SearchResult) Filter(keys ...string) []map[string]interface{} {
 			}
 			find := v.Find(field)
 			if k != "_index" && find != nil {
-				if expr == "" {
+				if fv := fmt.Sprintf("%v", find); expr == "" {
 					count++
-				} else if reg, err := regexp.Compile(expr); err == nil && reg.MatchString(v.FindString(field)) {
+				} else if reg, err := regexp.Compile(expr); err == nil && reg.MatchString(fv) {
 					count++
 				} else {
 					notMatch = true
@@ -314,7 +335,6 @@ func (r *SearchResult) Filter(keys ...string) []map[string]interface{} {
 			filtered = append(filtered, item)
 		}
 	}
-	r.FilterCache = filtered
 	return filtered
 }
 
@@ -363,6 +383,61 @@ type HistoryResult struct {
 	baseResult
 	Count uint64        `json:"count"`
 	Data  []findableMap `json:"data"`
+}
+
+// Filter extracts data by specified fields from query results
+func (r *HistoryResult) Filter(keys ...string) []map[string]interface{} {
+	if n := len(keys); n == 0 || (n == 1 && (keys[0] == "" || keys[0] == "*")) {
+		keys = make([]string, 0, len(historyFilterFields))
+		for k := range historyFilterFields {
+			keys = append(keys, k)
+		}
+	}
+	filtered := make([]map[string]interface{}, 0, len(r.Data))
+	for _, v := range r.Data {
+		var (
+			item     = make(map[string]interface{})
+			count    int
+			notMatch bool
+		)
+		for _, k := range keys {
+			var expr string
+			if kv := strings.SplitN(k, "=", 2); len(kv) == 2 {
+				k = kv[0]
+				if expr = strings.TrimSpace(kv[1]); !strings.HasPrefix(expr, "(?i)") {
+					expr = "(?i)" + expr
+				}
+			}
+			k = strings.ToLower(strings.TrimSpace(k))
+			field, ok := historyFilterFields[k]
+			if !ok {
+				continue
+			}
+			find := v.Find(field)
+			if find != nil {
+				if fv := fmt.Sprintf("%v", find); expr == "" {
+					count++
+				} else if reg, err := regexp.Compile(expr); err == nil && reg.MatchString(fv) {
+					count++
+				} else {
+					notMatch = true
+					break
+				}
+			}
+			item[k] = find
+		}
+		if !notMatch && count > 0 {
+			item["ip"] = v.Find("ip")
+			item["open_port"] = v.Find("portinfo.port")
+			item["host"] = v.Find("portinfo.hostname")
+			item["country"] = v.Find("geoinfo.country.names.en")
+			item["city"] = v.Find("geoinfo.city.names.en")
+			item["org"] = v.Find("geoinfo.organization")
+			item["last_update"] = v.Find("timestamp")
+			filtered = append(filtered, item)
+		}
+	}
+	return filtered
 }
 
 func (r *HistoryResult) String() string {

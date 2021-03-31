@@ -91,10 +91,10 @@ succeed to query
 -type [host/web]     设置搜索资源类型，默认为 host（如：-type "web"）
 -force               强制调用 ZoomEye API 查询，忽略本地数据和缓存
 -count               查询该 dork 在 ZoomEye 数据库中的总量
--facet [field,...]   查询该 dork 在 ZoomEye 数据库中全量数据的分布情况，以逗号分隔（如：-facet "app,service,os"）
--stat [field,...]    统计本次搜索结果数据中指定字段的分布情况，以逗号分隔（如：-stat "app,service,os"）
+-facet [FIELD,...]   查询该 dork 在 ZoomEye 数据库中全量数据的分布情况，以逗号分隔（如：-facet "app,service,os"）
+-stat [FIELD,...]    统计本次搜索结果数据中指定字段的分布情况，以逗号分隔（如：-stat "app,service,os"）
 -figure [pie/hist]   输出统计数据的饼状图/柱状图（仅在指定了 -facet 或 -stat 参数下有效）
--filter [field,...]  对本次搜索结果数据中指定字段进行筛选，以逗号分隔（如：-filter "app,ip,title"）
+-filter [FIELD,...]  对本次搜索结果数据中指定字段进行筛选，以逗号分隔（如：-filter "app,ip,title"）
 -save                保存本次搜索结果数据，若使用 filter 参数指定了筛选条件，筛选结果也会保存
 ```
 
@@ -104,8 +104,8 @@ succeed to query
     - 当 `-type` 为 `host` 时，可以使用 `app,device,service,os,port,country,city`
     - 当 `-type` 为 `web` 时，可以使用 `webapp,component,framework,frontend,server,waf,os,country,city`
 - `-filter`
-    - 当 `-type` 为 `host` 时，可以使用 `app,version,device,ip,port,hostname,city,country,asn,banner`
-    - 当 `-type` 为 `web` 时，可以使用 `app,headers,keywords,title,ip,site,city,country`
+    - 当 `-type` 为 `host` 时，可以使用 `app,version,device,ip,port,hostname,city,country,asn,banner,time,*`
+    - 当 `-type` 为 `web` 时，可以使用 `app,headers,keywords,title,ip,site,city,country,time,*`
 
 使用示例：
 
@@ -166,6 +166,50 @@ succeed to search (in 177.088662ms)
 
 可以通过 `load -h` 获取帮助。
 
+#### 设备历史数据搜索
+
+`ZoomEye-go`使用`history`命令根据指定的IP查询设备历史数据，支持的参数说明如下：
+
+```text
+-filter [FIELD,...]  对本次搜索结果数据中指定字段进行筛选，以逗号分隔（如：-filter "time,app,service"）
+-num [NUM]           设置显示的数据条数
+-force               强制调用 ZoomEye API 查询，忽略本地缓存
+```
+
+其中，`-filter`参数支持的取值范围有：`time,port,service,app,raw,*`
+
+使用示例：
+
+```bash
+./ZoomEye-go history "1.2.3.4" -filter "time=^2016-,app,service"
+succeed to query (in 533.785779ms)
+
+[History Info]
+
+  1.2.3.4
+  
+  Hostname:          [unknown]
+  Country:           United States
+  City:              Mukilteo
+  Organization:      [unknown]
+  Last Updated:      2016-11-22T12:08:31
+  
+  Open Ports:        1
+  Historical Probes: 1
+
+
+[History Result]
+
+  +---------------------+---------------------------+---------------------------+
+  | Time                | Service                   | App                       |
+  +---------------------+---------------------------+---------------------------+
+  | 2016-11-22T12:08:31 | ssh                       | OpenSSH                   |
+  +---------------------+---------------------------+---------------------------+
+  | Total: 1                                                                    |
+  +---------------------+---------------------------+---------------------------+
+
+```
+
 ### 使用SDK API
 
 使用示例：
@@ -202,6 +246,8 @@ func main() {
 
 	// 设备历史搜索（需要高级用户或VIP用户权限，结果包含多少条记录就会扣多少额度，非土豪慎用）
 	history, _ := zoom.HistoryIP("1.2.3.4")
+  // 对搜索结果进行筛选
+  histFilt := history.Filter("time=^2016", "app")
 }
 ```
 

@@ -38,12 +38,14 @@ const (
 )
 
 var (
-	spaces = map[rune]string{
+	ctrlChars = map[rune]string{
 		'\t': "\\t",
 		'\n': "\\n",
 		'\v': "\\v",
 		'\f': "\\f",
 		'\r': "\\r",
+		'\a': "\\a",
+		'\b': "\\b",
 	}
 	pieColors = []string{
 		"\033[1;34m", "\033[1;35m", "\033[1;36m", "\033[1;31m", "\033[1;33m",
@@ -87,6 +89,48 @@ func infof(title, format string, a ...interface{}) {
 	}
 }
 
+func toStr(o interface{}) string {
+	if o == nil {
+		return ""
+	}
+	switch o := o.(type) {
+	case string:
+		return o
+	case []string:
+		return strings.Join(o, ",")
+	case []interface{}:
+		s := make([]string, len(o))
+		for i, v := range o {
+			s[i] = fmt.Sprintf("%v", v)
+		}
+		return strings.Join(s, ",")
+	default:
+		return fmt.Sprintf("%v", o)
+	}
+}
+
+func omitStr(o interface{}, maxWidth int) string {
+	var builder strings.Builder
+	for _, r := range toStr(o) {
+		if r > 31 && r < 127 {
+			builder.WriteRune(r)
+		} else if v, ok := ctrlChars[r]; ok {
+			builder.WriteString(v)
+		} else {
+			builder.WriteString(fmt.Sprintf("\\x%02x", r))
+		}
+	}
+	s := builder.String()
+	if n := len(s); n > maxWidth {
+		if maxWidth > 3 {
+			s = s[:maxWidth-3] + "..."
+		} else {
+			s = strings.Repeat(".", maxWidth)
+		}
+	}
+	return strings.ReplaceAll(s, "%", "%%")
+}
+
 func tablef(title string, head [][2]interface{}, body map[string][][]interface{}, count bool) {
 	var (
 		builder strings.Builder
@@ -122,19 +166,30 @@ func tablef(title string, head [][2]interface{}, body map[string][][]interface{}
 	builder.WriteString(fmt.Sprintf(hfmt, names...) + "\n")
 	if len(body) > 0 {
 		for k, group := range body {
+			if isGroup {
+				k = omitStr(k, widths[0])
+			}
 			builder.WriteString(line + "\n")
 			for i, v := range group {
 				if len(v) < len(head)-1 {
 					continue
 				}
+				v = v[:len(head)-1]
+				for i := range v {
+					j := i
+					if isGroup {
+						j++
+					}
+					v[i] = omitStr(v[i], widths[j])
+				}
 				if total++; k == "" && !isGroup {
-					builder.WriteString(fmt.Sprintf(bfmt, v[:len(head)-1]...) + "\n")
+					builder.WriteString(fmt.Sprintf(bfmt, v...) + "\n")
 					continue
 				}
 				if i > 0 {
 					k = ""
 				}
-				params := append([]interface{}{k}, v[:len(head)-1]...)
+				params := append([]interface{}{k}, v...)
 				builder.WriteString(fmt.Sprintf(bfmt, params...) + "\n")
 			}
 		}
@@ -145,7 +200,9 @@ func tablef(title string, head [][2]interface{}, body map[string][][]interface{}
 		builder.WriteString(line + "\n")
 		builder.WriteString(fmt.Sprintf(
 			fmt.Sprintf(
-				colorf("|", colorLightBlack)+colorf(" %%-%ds ", colorLightPurple)+colorf("|", colorLightBlack)+"\n",
+				colorf("|", colorLightBlack)+
+					colorf(" %%-%ds ", colorLightPurple)+
+					colorf("|", colorLightBlack)+"\n",
 				len(line)-15,
 			),
 			fmt.Sprintf("Total: %d", total),
@@ -181,12 +238,16 @@ func htablef(title string, body []map[string]interface{}, widths [3]int, count b
 		for _, item := range body {
 			total++
 			builder.WriteString(line + "\n")
-			name := item["name"].(string)
+			name := omitStr(item["name"], widths[0])
 			for i, v := range item["items"].([]map[string]interface{}) {
 				if i > 0 {
 					name = ""
 				}
-				builder.WriteString(fmt.Sprintf(bfmt, name, v["key"], v["value"]) + "\n")
+				var (
+					key = omitStr(v["key"], widths[1])
+					val = omitStr(v["value"], widths[2])
+				)
+				builder.WriteString(fmt.Sprintf(bfmt, name, key, val) + "\n")
 			}
 		}
 	} else {
@@ -196,7 +257,9 @@ func htablef(title string, body []map[string]interface{}, widths [3]int, count b
 		builder.WriteString(line + "\n")
 		builder.WriteString(fmt.Sprintf(
 			fmt.Sprintf(
-				colorf("|", colorLightBlack)+colorf(" %%-%ds ", colorLightPurple)+colorf("|", colorLightBlack)+"\n",
+				colorf("|", colorLightBlack)+
+					colorf(" %%-%ds ", colorLightPurple)+
+					colorf("|", colorLightBlack)+"\n",
 				len(line)-15,
 			),
 			fmt.Sprintf("Total: %d", total),
@@ -243,8 +306,9 @@ func pief(title string, body map[string][][]interface{}) {
 					if i == 1 {
 						builder.WriteString(c + "   " + colorf("Type: "+k, colorLightGreen) + "\n")
 					} else if n := i - 3; n >= 0 && n < len(v) {
+						name := omitStr(v[n][0], 35)
 						builder.WriteString(c + "   " +
-							colorf(fmt.Sprintf("%5.2f%%%% - %s", v[n][2].(float64)*100, v[n][0]), pieColors[n]) + "\n")
+							colorf(fmt.Sprintf("%5.2f%%%% - %s", v[n][2].(float64)*100, name), pieColors[n]) + "\n")
 					} else if builder.WriteString(c); i < 13 {
 						builder.WriteString("\n")
 					}
@@ -283,6 +347,9 @@ func histf(title string, body map[string][][]interface{}) {
 					maxCount = n
 				}
 			}
+			if maxNameLen > 35 {
+				maxNameLen = 35
+			}
 			format := fmt.Sprintf("%%%ds  [%%%dd]  %%s", maxNameLen, maxCountLen)
 			for i, o := range v {
 				var (
@@ -292,7 +359,7 @@ func histf(title string, body map[string][][]interface{}) {
 				if n%8 > 0 {
 					bar += histChars[n%8]
 				}
-				builder.WriteString(colorf(fmt.Sprintf(format, o[0], o[1], bar), colorLightWhite))
+				builder.WriteString(colorf(fmt.Sprintf(format, omitStr(o[0], 35), o[1], bar), colorLightWhite))
 				if i < len(v)-1 {
 					builder.WriteString("\n")
 				}
@@ -302,33 +369,41 @@ func histf(title string, body map[string][][]interface{}) {
 	infof(title, builder.String())
 }
 
-func convertStr(s string) string {
-	var builder strings.Builder
-	for _, r := range s {
-		if r > 31 && r < 127 {
-			builder.WriteRune(r)
-		} else if v, ok := spaces[r]; ok {
-			builder.WriteString(v)
-		} else {
-			builder.WriteString(fmt.Sprintf("\\x%02x", r))
+func withUnknown(o interface{}) string {
+	if s := toStr(o); s != "" && !strings.EqualFold(strings.TrimSpace(s), "unknown") {
+		return s
+	}
+	return "[unknown]"
+}
+
+func withVersion(o interface{}) string {
+	if o == nil {
+		return ""
+	}
+	if o, ok := o.([]interface{}); ok {
+		var s string
+		for i, v := range o {
+			if v, ok := v.(map[string]interface{}); ok {
+				if i > 0 {
+					s += ","
+				}
+				s += v["name"].(string)
+				if ver := v["version"]; ver != nil && ver != "" {
+					s += "(" + ver.(string) + ")"
+				}
+			}
 		}
+		return s
 	}
-	return builder.String()
+	return ""
 }
 
-func omitStr(s string, maxWidth int) string {
-	if len(s) > maxWidth {
-		s = s[:maxWidth-3] + "..."
-	}
-	return strings.ReplaceAll(s, "%", "%%")
-}
-
-func printFacet(result *zoomeye.SearchResult, facets []string, figure string) {
+func showFacet(result *zoomeye.SearchResult, facets []string, figure string) {
 	var (
 		head = [][2]interface{}{
-			[2]interface{}{"Type", 10},
-			[2]interface{}{"Name", 35},
-			[2]interface{}{"Count", 20},
+			{"Type", 10},
+			{"Name", 35},
+			{"Count", 20},
 		}
 		body = make(map[string][][]interface{})
 	)
@@ -341,19 +416,11 @@ func printFacet(result *zoomeye.SearchResult, facets []string, figure string) {
 		if facet, ok := result.Facets[s]; ok {
 			group := make([][]interface{}, 0, len(facet))
 			for _, v := range facet {
-				var name string
-				switch n := v.Name.(type) {
-				case string:
-					name = n
-				case nil:
-				default:
-					name = fmt.Sprintf("%v", n)
-				}
-				if name == "" {
-					name = "[unknown]"
-				}
-				group = append(group, []interface{}{omitStr(name, 35), v.Count,
-					float64(v.Count) / float64(result.Total)})
+				group = append(group, []interface{}{
+					withUnknown(v.Name),
+					v.Count,
+					float64(v.Count) / float64(result.Total),
+				})
 			}
 			body[f] = group
 		}
@@ -368,19 +435,23 @@ func printFacet(result *zoomeye.SearchResult, facets []string, figure string) {
 	}
 }
 
-func printStat(result *zoomeye.SearchResult, keys []string, figure string) {
+func showStat(result *zoomeye.SearchResult, keys []string, figure string) {
 	var (
 		head = [][2]interface{}{
-			[2]interface{}{"Type", 10},
-			[2]interface{}{"Name", 35},
-			[2]interface{}{"Count", 20},
+			{"Type", 10},
+			{"Name", 35},
+			{"Count", 20},
 		}
 		body = make(map[string][][]interface{})
 	)
 	for s, stat := range result.Statistics(keys...) {
 		group := make([][]interface{}, 0, len(stat))
 		for k, v := range stat {
-			group = append(group, []interface{}{omitStr(k, 35), v, float64(v) / float64(len(result.Matches))})
+			group = append(group, []interface{}{
+				k,
+				v,
+				float64(v) / float64(len(result.Matches)),
+			})
 		}
 		sort.Slice(group, func(i, j int) bool {
 			return group[j][1].(uint64) < group[i][1].(uint64)
@@ -397,35 +468,12 @@ func printStat(result *zoomeye.SearchResult, keys []string, figure string) {
 	}
 }
 
-func dataToString(o interface{}) string {
-	if o == nil {
-		return ""
-	}
-	switch o := o.(type) {
-	case string:
-		return o
-	case []string:
-		return strings.Join(o, ",")
-	case []interface{}:
-		var s string
-		for i, v := range o {
-			if i > 0 {
-				s += ","
-			}
-			s += fmt.Sprintf("%v", v)
-		}
-		return s
-	default:
-		return fmt.Sprintf("%v", o)
-	}
-}
-
-func printFilter(result *zoomeye.SearchResult, keys []string) {
+func showFilter(result *zoomeye.SearchResult, keys []string) []map[string]interface{} {
 	var (
-		filters = result.Filter(keys...)
-		body    = make([]map[string]interface{}, len(filters))
+		filtered = result.Filter(keys...)
+		body     = make([]map[string]interface{}, len(filtered))
 	)
-	for i, filt := range filters {
+	for i, filt := range filtered {
 		var (
 			index = filt["_index"].(string)
 			items = make([]map[string]interface{}, 0, len(filt)-1)
@@ -434,65 +482,43 @@ func printFilter(result *zoomeye.SearchResult, keys []string) {
 			if k != "_index" {
 				items = append(items, map[string]interface{}{
 					"key":   strings.ToTitle(k),
-					"value": omitStr(convertStr(dataToString(v)), 75),
+					"value": v,
 				})
 			}
 		}
+		sort.Slice(items, func(i, j int) bool {
+			return items[i]["key"].(string) < items[j]["key"].(string)
+		})
 		body[i] = map[string]interface{}{
-			"name":  omitStr(index, 30),
+			"name":  index,
 			"items": items,
 		}
 	}
 	htablef("Result Filtered", body, [3]int{30, 15, 75}, true)
+	return filtered
 }
 
-func withVersion(o interface{}) string {
-	if o == nil {
-		return ""
-	}
-	if o, ok := o.([]interface{}); ok {
-		var s string
-		for i, v := range o {
-			if v, ok := v.(map[string]interface{}); ok {
-				if i > 0 {
-					s += ","
-				}
-				var (
-					name = v["name"]
-					ver  = v["version"]
-				)
-				s += name.(string)
-				if ver != nil && ver != "" {
-					s += "(" + ver.(string) + ")"
-				}
-			}
-		}
-		return s
-	}
-	return ""
-}
-
-func printData(result *zoomeye.SearchResult) {
+func showData(result *zoomeye.SearchResult) {
 	switch result.Type {
 	case "host":
 		var (
 			head = [][2]interface{}{
-				[2]interface{}{"-", 0},
-				[2]interface{}{"Host", 21},
-				[2]interface{}{"Application", 20},
-				[2]interface{}{"Service", 20},
-				[2]interface{}{"Banner", 40},
-				[2]interface{}{"Country", 20},
+				{"-", 0},
+				{"Host", 21},
+				{"Application", 20},
+				{"Service", 20},
+				{"Banner", 40},
+				{"Country", 20},
 			}
 			body = make([][]interface{}, len(result.Matches))
 		)
 		for i, v := range result.Matches {
 			body[i] = []interface{}{
-				omitStr(v.FindString("ip")+":"+v.FindString("portinfo.port"), 21),
-				omitStr(v.FindString("portinfo.app"), 20),
-				omitStr(v.FindString("portinfo.service"), 20),
-				omitStr(convertStr(v.FindString("portinfo.banner")), 40),
-				omitStr(v.FindString("geoinfo.country.names.en"), 20),
+				v.FindString("ip") + ":" + v.FindString("portinfo.port"),
+				v.FindString("portinfo.app"),
+				v.FindString("portinfo.service"),
+				v.FindString("portinfo.banner"),
+				v.FindString("geoinfo.country.names.en"),
 			}
 		}
 		tablef("Host Search Result", head, map[string][][]interface{}{"": body}, true)
@@ -500,51 +526,122 @@ func printData(result *zoomeye.SearchResult) {
 		body := make([]map[string]interface{}, len(result.Matches))
 		for i, v := range result.Matches {
 			body[i] = map[string]interface{}{
-				"name": omitStr(v.FindString("site"), 30),
+				"name": v.FindString("site"),
 				"items": []map[string]interface{}{
-					map[string]interface{}{
+					{
 						"key":   "IP",
-						"value": omitStr(dataToString(v.Find("ip")), 75),
+						"value": v.Find("ip"),
 					},
-					map[string]interface{}{
+					{
 						"key":   "Domains",
-						"value": omitStr(dataToString(v.Find("domains")), 75),
+						"value": v.Find("domains"),
 					},
-					map[string]interface{}{
-						"key":   "Application",
-						"value": omitStr(withVersion(v.Find("webapp")), 75),
-					},
-					map[string]interface{}{
-						"key":   "Title",
-						"value": omitStr(convertStr(v.FindString("title")), 75),
-					},
-					map[string]interface{}{
-						"key":   "Framework",
-						"value": omitStr(withVersion(v.Find("framework")), 75),
-					},
-					map[string]interface{}{
-						"key":   "Server",
-						"value": omitStr(withVersion(v.Find("server")), 75),
-					},
-					map[string]interface{}{
-						"key":   "System",
-						"value": omitStr(withVersion(v.Find("system")), 75),
-					},
-					map[string]interface{}{
-						"key":   "Database",
-						"value": omitStr(withVersion(v.Find("db")), 75),
-					},
-					map[string]interface{}{
-						"key":   "WAF",
-						"value": omitStr(withVersion(v.Find("waf")), 75),
-					},
-					map[string]interface{}{
+					{
 						"key":   "Country",
 						"value": v.FindString("geoinfo.country.names.en"),
+					},
+					{
+						"key":   "Title",
+						"value": v.FindString("title"),
+					},
+					{
+						"key":   "Application",
+						"value": withVersion(v.Find("webapp")),
+					},
+					{
+						"key":   "Framework",
+						"value": withVersion(v.Find("framework")),
+					},
+					{
+						"key":   "Server",
+						"value": withVersion(v.Find("server")),
+					},
+					{
+						"key":   "System",
+						"value": withVersion(v.Find("system")),
+					},
+					{
+						"key":   "Database",
+						"value": withVersion(v.Find("db")),
+					},
+					{
+						"key":   "WAF",
+						"value": withVersion(v.Find("waf")),
 					},
 				},
 			}
 		}
 		htablef("Web Search Result", body, [3]int{30, 15, 75}, true)
 	}
+}
+
+func showHistory(result *zoomeye.HistoryResult, keys []string, num int) {
+	var (
+		filtered = result.Filter(keys...)
+		n        = len(filtered)
+	)
+	if n == 0 {
+		infof("[History Info]", "no any historical data")
+		return
+	}
+	if num > 0 && num < n {
+		filtered = filtered[:n]
+	}
+	var (
+		first = filtered[0]
+		info  = fmt.Sprintf("%s\n\n"+
+			"Hostname:          %s\n"+
+			"Country:           %s\n"+
+			"City:              %s\n"+
+			"Organization:      %s\n"+
+			"Last Updated:      %s\n\n",
+			first["ip"], withUnknown(first["host"]), withUnknown(first["country"]),
+			withUnknown(first["city"]), withUnknown(first["org"]), first["last_update"])
+	)
+	var (
+		head = [][2]interface{}{
+			{"-", 0},
+			{"Time", 19},
+			{"Port", 5},
+			{"Service", 25},
+			{"App", 25},
+			{"Raw", 45},
+		}
+		body = make([][]interface{}, len(filtered))
+	)
+	for i := 2; i < len(head); {
+		if _, ok := first[strings.ToLower(head[i][0].(string))]; !ok {
+			head = append(head[:i], head[i+1:]...)
+		} else {
+			i++
+		}
+	}
+	if len(head) == 6 {
+		head[3][0] = "Port/Service"
+		head = append(head[:2], head[3:]...)
+	}
+	ports := make(map[string]struct{})
+	for i, f := range filtered {
+		if p := toStr(f["open_port"]); p != "" {
+			ports[p] = struct{}{}
+		}
+		row := make([]interface{}, 0, 5)
+		for i := 1; i < len(head); i++ {
+			var (
+				sp = strings.SplitN(head[i][0].(string), "/", 2)
+				v  = make([]string, 0, 2)
+			)
+			for _, k := range sp {
+				v = append(v, toStr(f[strings.ToLower(k)]))
+			}
+			row = append(row, strings.Join(v, "/"))
+		}
+		if row[0] == "" {
+			row[0] = f["last_update"]
+		}
+		body[i] = row
+	}
+	info += fmt.Sprintf("Open Ports:        %d\nHistorical Probes: %d", len(ports), len(filtered))
+	infof("History Info", info)
+	tablef("History Result", head, map[string][][]interface{}{"": body}, true)
 }

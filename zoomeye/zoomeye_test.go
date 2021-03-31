@@ -95,4 +95,5 @@ func TestHistoryIP(t *testing.T) {
 		t.FailNow()
 	}
 	t.Log(result)
+	t.Log(result.Filter("time=^2016", "app"))
 }

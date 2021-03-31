@@ -6,62 +6,67 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strconv"
 	"strings"
 	"time"
+	"unsafe"
 
 	"github.com/gyyyy/ZoomEye-go/zoomeye"
 )
 
-func usage(cmd string, examples ...string) func() {
-	var example string
-	if len(examples) > 0 {
-		example = "Example:\n"
-		for _, v := range examples {
-			example += fmt.Sprintf("  ./ZoomEye-go %s %s\n", cmd, v)
+func parseFlags(cmd string, flgs interface{}, examples ...string) []string {
+	if flgs != nil {
+		var (
+			v    = reflect.ValueOf(flgs)
+			elem = v.Elem()
+			ptr  = v.Pointer()
+		)
+		for i := 0; i < elem.NumField(); i++ {
+			var (
+				f      = elem.Type().Field(i)
+				fname  = f.Tag.Get("name")
+				fvalue = f.Tag.Get("value")
+				fusage = f.Tag.Get("usage")
+				fptr   = unsafe.Pointer(ptr + f.Offset)
+			)
+			if fname == "" {
+				fname = strings.ToLower(f.Name)
+			}
+			switch f.Type.Kind() {
+			case reflect.String:
+				flag.StringVar((*string)(fptr), fname, fvalue, fusage)
+			case reflect.Int:
+				val, _ := strconv.Atoi(fvalue)
+				flag.IntVar((*int)(fptr), fname, val, fusage)
+			case reflect.Bool:
+				val, _ := strconv.ParseBool(fvalue)
+				flag.BoolVar((*bool)(fptr), fname, val, fusage)
+			}
 		}
-		example += "\n"
 	}
-	return func() {
+	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "\nUsage of %s (%s):\n", filepath.Base(os.Args[0]), cmd)
 		flag.PrintDefaults()
-		if example != "" {
-			fmt.Fprintf(flag.CommandLine.Output(), "\n"+example)
+		if len(examples) > 0 {
+			example := "Example:\n"
+			for _, v := range examples {
+				example += fmt.Sprintf("  ./ZoomEye-go %s %s\n", cmd, v)
+			}
+			fmt.Fprintf(flag.CommandLine.Output(), "\n%s\n", example)
 		}
 	}
-}
-
-func cmdInit(agent *ZoomEyeAgent) {
-	var args struct {
-		apiKey   string
-		username string
-		password string
+	var args []string
+	for i := 1; i < len(os.Args); {
+		if p := os.Args[i]; !strings.HasPrefix(p, "-") {
+			args = append(args, p)
+			os.Args = append(os.Args[0:i], os.Args[i+1:]...)
+		} else {
+			break
+		}
 	}
-	flag.StringVar(&args.apiKey, "apikey", "", "ZoomEye API-Key")
-	flag.StringVar(&args.username, "username", "", "ZoomEye account username")
-	flag.StringVar(&args.password, "password", "", "ZoomEye account password")
-	flag.Usage = usage("init", `-apikey "XXXXXXXX-XXXX-XXXXX-XXXX-XXXXXXXXXXX"`,
-		`-username "username@zoomeye.org" -password "password"`)
 	flag.Parse()
-	var (
-		result *zoomeye.ResourcesInfoResult
-		err    error
-	)
-	if args.apiKey != "" {
-		if result, err = agent.InitByKey(args.apiKey); err != nil {
-			errorf("failed to initialize: %v", err)
-			return
-		}
-	} else if args.username != "" && args.password != "" {
-		if result, err = agent.InitByUser(args.username, args.password); err != nil {
-			errorf("failed to initialize: %v", err)
-			return
-		}
-	} else if result, err = agent.InitLocal(); err != nil {
-		warnf("required parameter missing, please run <zoomeye init -h> for help")
-		return
-	}
-	successf("succeed to initialize")
-	infof("ZoomEye Resources Info", "Role:  %s\nQuota: %d", result.Plan, result.Resources.Search)
+	return args
 }
 
 func checkError(err error) {
@@ -74,28 +79,6 @@ func checkError(err error) {
 	default:
 		errorf("something is wrong: %v", err)
 	}
-}
-
-func cmdInfo(agent *ZoomEyeAgent) {
-	result, err := agent.Info()
-	if err != nil {
-		checkError(err)
-		return
-	}
-	successf("succeed to query")
-	infof("ZoomEye Resources Info", "Role:  %s\nQuota: %d", result.Plan, result.Resources.Search)
-}
-
-func commandVal() (string, bool) {
-	if len(os.Args) <= 1 {
-		return "", false
-	}
-	v := os.Args[1]
-	if strings.HasPrefix(v, "-") {
-		return "", true
-	}
-	os.Args = append(os.Args[0:1], os.Args[2:]...)
-	return v, true
 }
 
 type resultAnalyzer struct {
@@ -118,7 +101,7 @@ func newResultAnalyzer() *resultAnalyzer {
 	return analyzer
 }
 
-func (a *resultAnalyzer) do(result *zoomeye.SearchResult, saveCallback func()) {
+func (a *resultAnalyzer) do(result *zoomeye.SearchResult, saveCallback func([]map[string]interface{})) {
 	if a.count {
 		infof("ZoomEye Total", "Count: %d", result.Total)
 	}
@@ -128,44 +111,81 @@ func (a *resultAnalyzer) do(result *zoomeye.SearchResult, saveCallback func()) {
 		}
 	}
 	if a.facet != "" {
-		printFacet(result, strings.Split(a.facet, ","), a.figure)
+		showFacet(result, strings.Split(a.facet, ","), a.figure)
 	}
 	if a.stat != "" {
-		printStat(result, strings.Split(a.stat, ","), a.figure)
+		showStat(result, strings.Split(a.stat, ","), a.figure)
 	}
+	var filtered []map[string]interface{}
 	if a.filter != "" {
-		printFilter(result, strings.Split(a.filter, ","))
+		filtered = showFilter(result, strings.Split(a.filter, ","))
 	}
 	if !a.count && a.facet == "" && a.stat == "" && a.filter == "" {
-		printData(result)
+		showData(result)
 	}
 	if a.save && saveCallback != nil {
-		saveCallback()
+		saveCallback(filtered)
 	}
 }
 
+func cmdInit(agent *ZoomEyeAgent) {
+	var flgs struct {
+		apiKey   string `usage:"ZoomEye API-Key"`
+		username string `usage:"ZoomEye account username"`
+		password string `usage:"ZoomEye account password"`
+	}
+	parseFlags("init", &flgs, `-apikey "XXXXXXXX-XXXX-XXXXX-XXXX-XXXXXXXXXXX"`,
+		`-username "username@zoomeye.org" -password "password"`)
+	var (
+		result *zoomeye.ResourcesInfoResult
+		err    error
+	)
+	if flgs.apiKey != "" {
+		if result, err = agent.InitByKey(flgs.apiKey); err != nil {
+			errorf("failed to initialize: %v", err)
+			return
+		}
+	} else if flgs.username != "" && flgs.password != "" {
+		if result, err = agent.InitByUser(flgs.username, flgs.password); err != nil {
+			errorf("failed to initialize: %v", err)
+			return
+		}
+	} else if result, err = agent.InitLocal(); err != nil {
+		warnf("required parameter missing, please run <zoomeye init -h> for help")
+		return
+	}
+	successf("succeed to initialize")
+	infof("ZoomEye Resources Info", "Role:  %s\nQuota: %d", result.Plan, result.Resources.Search)
+}
+
+func cmdInfo(agent *ZoomEyeAgent) {
+	result, err := agent.Info()
+	if err != nil {
+		checkError(err)
+		return
+	}
+	successf("succeed to query")
+	infof("ZoomEye Resources Info", "Role:  %s\nQuota: %d", result.Plan, result.Resources.Search)
+}
+
 func cmdSearch(agent *ZoomEyeAgent) {
-	dork, ok := commandVal()
-	if !ok {
+	var (
+		analyzer = newResultAnalyzer()
+		flgs     struct {
+			num      int    `value:"20" usage:"The number of search results that should be returned, multiple of 20"`
+			resource string `name:"type" usage:"Specify the type of resource to search"`
+			force    bool   `usage:"Ignore local and cache data"`
+		}
+		args = parseFlags("search", &flgs, `"weblogic" -facet "app" -count`)
+	)
+	if len(args) == 0 {
 		warnf("search keyword missing, please run <zoomeye search -h> for help")
 		return
 	}
 	var (
-		analyzer = newResultAnalyzer()
-		args     struct {
-			num      int
-			resource string
-			force    bool
-		}
-	)
-	flag.IntVar(&args.num, "num", 20, "The number of search results that should be returned, multiple of 20")
-	flag.StringVar(&args.resource, "type", "host", "Specify the type of resource to search")
-	flag.BoolVar(&args.force, "force", false, "Ignore local and cache data")
-	flag.Usage = usage("search", `"weblogic" -facet "app" -count`)
-	flag.Parse()
-	var (
+		dork        = args[0]
 		start       = time.Now()
-		result, err = agent.Search(dork, args.num, args.resource, args.force)
+		result, err = agent.Search(dork, flgs.num, flgs.resource, flgs.force)
 		since       = time.Since(start)
 	)
 	if err != nil {
@@ -173,37 +193,41 @@ func cmdSearch(agent *ZoomEyeAgent) {
 		return
 	}
 	successf("succeed to search (in %v)", since)
-	analyzer.do(result, func() {
-		name := fmt.Sprintf("%s_%s_%d", args.resource, url.QueryEscape(dork), args.num)
+	analyzer.do(result, func(filtered []map[string]interface{}) {
+		name := fmt.Sprintf("%s_%s_%d", flgs.resource, url.QueryEscape(dork), flgs.num)
 		if path, err := agent.Save(name, result); err != nil {
 			errorf("failed to save: %v", err)
 		} else {
 			successf("succeed to save (%s)", path)
+			agent.SaveFilterData(filepath.Join(agent.conf.DataPath, name+"_filtered.json"), filtered)
 		}
 	})
 }
 
 func cmdLoad(agent *ZoomEyeAgent) {
-	file, ok := commandVal()
-	if !ok {
+	var (
+		analyzer = newResultAnalyzer()
+		args     = parseFlags("load", nil, `"data/host_weblogic_20.json" -facet "app" -count`)
+	)
+	if len(args) == 0 {
 		warnf("path of local data file missing, please run <zoomeye load -h> for help")
 		return
 	}
-	analyzer := newResultAnalyzer()
-	flag.Usage = usage("load", `"data/host_weblogic_20.json" -facet "app" -count`)
-	flag.Parse()
-	result, err := agent.Load(file)
+	var (
+		file        = args[0]
+		result, err = agent.Load(file)
+	)
 	if err != nil {
 		errorf("invalid local data: %v", err)
 		return
 	}
 	successf("succeed to load")
-	analyzer.do(result, func() {
+	analyzer.do(result, func(filtered []map[string]interface{}) {
 		var (
 			ext  = filepath.Ext(file)
 			path = strings.TrimSuffix(file, ext) + "_filtered" + ext
 		)
-		if err := agent.SaveFilterData(path, result.FilterCache); err != nil {
+		if err := agent.SaveFilterData(path, filtered); err != nil {
 			errorf("failed to save: %v", err)
 		} else {
 			path, _ = filepath.Abs(path)
@@ -212,15 +236,38 @@ func cmdLoad(agent *ZoomEyeAgent) {
 	})
 }
 
+func cmdHistory(agent *ZoomEyeAgent) {
+	var (
+		flgs struct {
+			filter string `usage:"Output more clearer query results by set filter field"`
+			num    int    `value:"20" usage:"The number of results that should be returned"`
+			force  bool   `usage:"Ignore cache data"`
+		}
+		args = parseFlags("history", &flgs, `"0.0.0.0" -filter "time=^2020-03,port,service" -num 1`)
+	)
+	if len(args) == 0 {
+		warnf("ip missing, please run <zoomeye history -h> for help")
+		return
+	}
+	var (
+		start       = time.Now()
+		result, err = agent.History(args[0], flgs.force)
+		since       = time.Since(start)
+	)
+	if err != nil {
+		checkError(err)
+		return
+	}
+	successf("succeed to query (in %v)", since)
+	showHistory(result, strings.Split(flgs.filter, ","), flgs.num)
+}
+
 func cmdClear(agent *ZoomEyeAgent) {
-	var args struct {
+	var flgs struct {
 		cache   bool
 		setting bool
 	}
-	flag.BoolVar(&args.cache, "cache", false, "local cache file")
-	flag.BoolVar(&args.setting, "setting", false, "user api key and access token")
-	flag.Usage = usage("clear", `-cache`, `-cache -setting`)
-	flag.Parse()
-	agent.Clear(args.cache, args.setting)
+	parseFlags("clear", &flgs, `-cache`, `-cache -setting`)
+	agent.Clear(flgs.cache, flgs.setting)
 	successf("succeed to clear data")
 }
